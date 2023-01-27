@@ -203,11 +203,18 @@ _resolve_symlink() {
 #   https://stackoverflow.com/q/43171648
 #   https://stackoverflow.com/a/16746032
 _sed_i() {
-  if sed --help >/dev/null 2>&1
+  local _usage=
+
+  if _usage="$(sed --help 2>&1)"
   then # GNU
-    sed -i    "${@}"
+    sed -i      "${@}"
   else # BSD
-    sed -i '' "${@}"
+    if [[ "${_usage:-}" =~ unknown\ option ]]
+    then # OpenBSD
+      sed -i''  "${@}"
+    else # FreeBSD, macOS
+      sed -i '' "${@}"
+    fi
   fi
 }
 
@@ -10925,6 +10932,11 @@ header {
   padding-top:        0.5rem;
 }
 
+.math.display:focus,
+.MathJax:focus {
+  outline:            none;
+}
+
 .item-list {
   margin-top:         0;
 }
@@ -11061,12 +11073,6 @@ div.column {
 div.hanging-indent {
   margin-left:        1.5em;
   text-indent:        -1.5em;
-}
-
-.display.math {
-  display:            block;
-  margin:             0.5rem auto;
-  text-align:         center;
 }
 
 span.smallcaps {
@@ -11390,6 +11396,11 @@ HEREDOC
         _pandoc_arguments+=("--from=markdown+raw_html")
       fi
 
+      if ((${NB_MATHJAX_ENABLED:-0}))
+      then
+        _pandoc_arguments+=("--mathjax=/--mathjax/tex-chtml.js")
+      fi
+
       {
         if _piped_input
         then
@@ -11461,11 +11472,6 @@ HEREDOC
     then
       if ((${NB_ACE_ENABLED:-0}))
       then
-        if [[ ! -e "${NB_DIR}/.assets/ace-builds" ]] && ! ((${NB_TESTING:-0}))
-        then
-          _env install --ace
-        fi
-
         cat <<HEREDOC
 <script src="/--ace/ace.js"></script>
 <script src="/--ace/ext-modelist.js"></script>
@@ -11562,6 +11568,13 @@ HEREDOC
     }
   }());
 </script>
+HEREDOC
+      fi
+
+      if ((${NB_MATHJAX_ENABLED:-0}))
+      then
+        cat <<HEREDOC
+<script id="MathJax-script" async src="/--mathjax/tex-chtml.js"></script>
 HEREDOC
       fi
 
@@ -13692,7 +13705,10 @@ _bookmark() {
           } | {
             if _command_exists "readable" && ((_readability_enabled))
             then
-              readable --base "${_url}" 2>/dev/null || cat
+              readable            \
+                --base "${_url}"  \
+                --quiet           \
+                2>/dev/null || cat
             else
               cat
             fi
@@ -14663,7 +14679,7 @@ _env() {
 
   case "${_subcommand}" in
     install)
-      if [[ ! "${2:-}" == "--ace"     ]]
+      if ! _contains "${2:-}" "--ace" "--mathjax"
       then # skip to next section if `_env install --ace`
         # packages: curl pandoc pygments w3m ripgrep tig
         if [[ -x "$(command -v apk)"  ]]
@@ -14746,21 +14762,38 @@ _env() {
         fi
       fi
 
-      # install ace editor
+      # install assets
 
-      if ((${NB_ACE_ENABLED:-0})) && [[ ! -e "${NB_DIR}/.assets/ace-builds" ]]
-      then
-        if [[ ! -e "${NB_DIR}/.assets" ]]
-        then
-          mkdir "${NB_DIR}/.assets"
-        fi
+      case "${2:-}" in
+        --ace)
+          if [[ ! -e "${NB_DIR}/.assets/ace-builds" ]]
+          then
+            if [[ ! -e "${NB_DIR}/.assets"          ]]
+            then
+              mkdir "${NB_DIR}/.assets"
+            fi
 
-        cd "${NB_DIR}/.assets" ||
-          _exit_1 printf "Unable to \`cd\` to %s\\n" "${NB_DIR}/.assets"
+            cd "${NB_DIR}/.assets" ||
+              _exit_1 printf "Unable to \`cd\` to %s\\n" "${NB_DIR}/.assets"
 
-        git clone https://github.com/ajaxorg/ace-builds.git
-      fi
+            git clone https://github.com/ajaxorg/ace-builds.git
+          fi
+          ;;
+        --mathjax)
+          if [[ ! -e "${NB_DIR}/.assets/MathJax"    ]]
+          then
+            if [[ ! -e "${NB_DIR}/.assets"          ]]
+            then
+              mkdir "${NB_DIR}/.assets"
+            fi
 
+            cd "${NB_DIR}/.assets" ||
+              _exit_1 printf "Unable to \`cd\` to %s\\n" "${NB_DIR}/.assets"
+
+            git clone https://github.com/mathjax/MathJax.git
+          fi
+          ;;
+      esac
       ;;
     uninstall)
       _completions uninstall
@@ -19407,6 +19440,14 @@ HEREDOC
       _url_params+="--local=${_encoded_local_notebook_path:-}"
     fi
 
+    local _maybe_columns_input=
+
+    if ((${_columns:-}))
+    then
+      _maybe_columns_input="\
+<input type=\"hidden\" name=\"--columns\"   value=\"${_columns}\">"
+    fi
+
     local _current_selector=
     local _maybe_local_input=
 
@@ -19578,6 +19619,7 @@ HEREDOC
 <i></i>
 <input type="hidden" name="--limit" value="${_limit}">
 <input type="hidden" name="--page"  value="${_current_page}">
+${_maybe_columns_input:-}
 ${_maybe_local_input:-}</form>
 <br>
 HEREDOC
@@ -20821,7 +20863,7 @@ HEREDOC
 
     local _message_body=
 
-    if [[ "${_request_method}"  == "POST"     ]]  &&
+    if [[ "${_request_method}"  == "POST"         ]]  &&
        ((${_content_length:-0}))
     then
       read -r -n "${_content_length}" _message_body
@@ -20829,12 +20871,24 @@ HEREDOC
 
     # serve ace editor files
 
-    if [[ "${_request_uri}"     =~ /--ace/.*  ]]
+    if [[ "${_request_uri}"     =~ /--ace/.*      ]]
     then
       local _target_relative_path="${_request_uri#/--ace/}"
 
       _browse_respond_with 200 \
         "${NB_DIR}/.assets/ace-builds/src-min-noconflict/${_target_relative_path}"
+
+      return 0
+    fi
+
+    # serve mathjax files
+
+    if [[ "${_request_uri}"     =~ /--mathjax/.*  ]]
+    then
+      local _target_relative_path="${_request_uri#/--mathjax/}"
+
+      _browse_respond_with 200 \
+        "${NB_DIR}/.assets/MathJax/es5/${_target_relative_path}"
 
       return 0
     fi
@@ -21498,6 +21552,30 @@ $(_color_primary "https://nmap.org/ncat/")
 HEREDOC
 
     exit 0
+  fi
+
+  # install enabled assets
+
+  if   ((${NB_ACE_ENABLED:-0}))     &&
+     ! ((${NB_TESTING:-0}))         &&
+     [[ ! -e "${NB_DIR}/.assets/ace-builds" ]]
+  then
+    printf "Installing %s%s\\n"         \
+      "$(_color_primary "Ace Editor")"  \
+      "$(_color_muted "...")"
+
+    _env install --ace
+  fi
+
+  if   ((${NB_MATHJAX_ENABLED:-0})) &&
+     ! ((${NB_TESTING:-0}))         &&
+     [[ ! -e "${NB_DIR}/.assets/MathJax"    ]]
+  then
+    printf "Installing %s%s\\n"         \
+      "$(_color_primary "MathJax")"     \
+      "$(_color_muted "...")"
+
+    _env install --mathjax
   fi
 
   # build initial request URL parameters and arguments
