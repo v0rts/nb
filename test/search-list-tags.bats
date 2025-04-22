@@ -20,7 +20,7 @@ Example Content Two #tag3 Example #tag1 Phrase.
 
 More content.
 
-#low-tag
+#lõw-tag
 
 ## Content
 
@@ -58,6 +58,32 @@ HEREDOC
     --content   "Sample Content One #other-tag1 Sample Phrase."
 }
 
+# filename handlng ############################################################
+
+@test "'--tags' with uncommon filenames lists all unique, readable tags in current notebook." {
+  {
+    _setup_tagged_items
+
+    "${_NB}" rename "File One.md"           "File [] One.md"          --force
+    "${_NB}" rename "File Two.bookmark.md"  "File ] Two.bookmark.md"  --force
+  }
+
+  run "${_NB}" --tags
+
+  printf "\${status}: '%s'\\n" "${status}"
+  printf "\${output}: '%s'\\n" "${output}"
+
+  [[ "${status}"    -eq 0             ]]
+  [[ "${#lines[@]}" -eq 6             ]]
+
+  [[ "${output}"    =~  \#nested-tag1 ]]
+  [[ "${output}"    =~  \#nested-tag2 ]]
+  [[ "${output}"    =~  \#tag1        ]]
+  [[ "${output}"    =~  \#tag2        ]]
+  [[ "${output}"    =~  \#tag3        ]]
+  [[ "${output}"    =~  \#lõw-tag     ]]
+}
+
 # _GIT_ENABLED=0 ##############################################################
 
 @test "'--tags' with _GIT_ENABLED=0 lists all unique, readable tags in <item>." {
@@ -78,7 +104,7 @@ HEREDOC
   [[ "${output}"    =~  \#tag1        ]]
   [[ "${output}"    =~  \#tag2        ]]
   [[ "${output}"    =~  \#tag3        ]]
-  [[ "${output}"    =~  \#low-tag     ]]
+  [[ "${output}"    =~  \#lõw-tag     ]]
 }
 
 # edge cases ##################################################################
@@ -199,7 +225,7 @@ HEREDOC
 
   [[ "${lines[0]}"  =~  \#tag3        ]]
   [[ "${lines[1]}"  =~  \#tag1        ]]
-  [[ "${lines[2]}"  =~  \#low-tag     ]]
+  [[ "${lines[2]}"  =~  \#lõw-tag     ]]
 }
 
 @test "'<folder>/ --tags' lists all unique tags in <folder>." {
@@ -237,7 +263,7 @@ HEREDOC
   [[ "${lines[2]}"  =~  \#tag1        ]]
   [[ "${lines[3]}"  =~  \#tag2        ]]
   [[ "${lines[4]}"  =~  \#tag3        ]]
-  [[ "${lines[5]}"  =~  \#low-tag     ]]
+  [[ "${lines[5]}"  =~  \#lõw-tag     ]]
 }
 
 @test "'--tags --all' lists all unique tags in all notebooks." {
@@ -258,7 +284,7 @@ HEREDOC
   [[ "${lines[2]}"  =~  \#nested-tag2 ]]
   [[ "${lines[3]}"  =~  \#tag1        ]]
   [[ "${lines[4]}"  =~  \#tag2        ]]
-  [[ "${lines[6]}"  =~  \#low-tag     ]]
+  [[ "${lines[6]}"  =~  \#lõw-tag     ]]
   [[ "${lines[5]}"  =~  \#tag3        ]]
 }
 
@@ -279,7 +305,7 @@ HEREDOC
 
   [[ "${lines[0]}"  =~  \#tag3        ]]
   [[ "${lines[1]}"  =~  \#tag1        ]]
-  [[ "${lines[2]}"  =~  \#low-tag     ]]
+  [[ "${lines[2]}"  =~  \#lõw-tag     ]]
 }
 
 @test "'list <folder>/ --tags' lists all unique tags in <folder>." {
@@ -317,7 +343,7 @@ HEREDOC
   [[ "${lines[2]}"  =~  \#tag1        ]]
   [[ "${lines[3]}"  =~  \#tag2        ]]
   [[ "${lines[4]}"  =~  \#tag3        ]]
-  [[ "${lines[5]}"  =~  \#low-tag     ]]
+  [[ "${lines[5]}"  =~  \#lõw-tag     ]]
 }
 
 @test "'list --tags --all' lists all unique tags in all notebooks." {
@@ -339,7 +365,7 @@ HEREDOC
   [[ "${lines[3]}"  =~  \#tag1        ]]
   [[ "${lines[4]}"  =~  \#tag2        ]]
   [[ "${lines[5]}"  =~  \#tag3        ]]
-  [[ "${lines[6]}"  =~  \#low-tag     ]]
+  [[ "${lines[6]}"  =~  \#lõw-tag     ]]
 }
 
 # `search` ####################################################################
@@ -359,7 +385,7 @@ HEREDOC
 
   [[ "${lines[0]}"  =~  \#tag3        ]]
   [[ "${lines[1]}"  =~  \#tag1        ]]
-  [[ "${lines[2]}"  =~  \#low-tag     ]]
+  [[ "${lines[2]}"  =~  \#lõw-tag     ]]
 }
 
 @test "'search <folder>/ --tags' lists all unique tags in <folder>." {
@@ -397,7 +423,7 @@ HEREDOC
   [[ "${lines[2]}"  =~  \#tag1        ]]
   [[ "${lines[3]}"  =~  \#tag2        ]]
   [[ "${lines[4]}"  =~  \#tag3        ]]
-  [[ "${lines[5]}"  =~  \#low-tag     ]]
+  [[ "${lines[5]}"  =~  \#lõw-tag     ]]
 }
 
 @test "'search --tags --all' lists all unique tags in all notebooks." {
@@ -419,5 +445,5 @@ HEREDOC
   [[ "${lines[3]}"  =~  \#tag1        ]]
   [[ "${lines[4]}"  =~  \#tag2        ]]
   [[ "${lines[5]}"  =~  \#tag3        ]]
-  [[ "${lines[6]}"  =~  \#low-tag     ]]
+  [[ "${lines[6]}"  =~  \#lõw-tag     ]]
 }

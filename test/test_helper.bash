@@ -8,6 +8,14 @@
 # https://github.com/sstephenson/bats
 ###############################################################################
 
+# bats_require_minimum_version
+#
+# https://github.com/bats-core/bats-core/blob/master/docs/source/writing-tests.md
+if hash "bats_require_minimum_version" &>/dev/null
+then
+  bats_require_minimum_version 1.5.0
+fi
+
 # _setup()
 #
 # Usage:
@@ -66,6 +74,11 @@ _setup() {
   #
   # Turn off auto-sync.
   export NB_AUTO_SYNC=0
+
+  # $NB_BROWSER_DOWNLOAD_ENABLED
+  #
+  # Turn off downloading pages with the browser.
+  export NB_BROWSER_DOWNLOAD_ENABLED=0
 
   # $NB_COLOR_PRIMARY
   #

@@ -2,6 +2,134 @@
 
 load test_helper
 
+# edge cases ##################################################################
+
+@test "'export pandoc' with front matter title containing a colon requires quotes around title." {
+  {
+    "${_NB}" init
+
+    "${_NB}" add                      \
+        --filename  "Example File.md" \
+        --content   "$(cat <<HEREDOC
+---
+title: 20240101010101 - Example Title Prefix: Example Title Content
+public: true
+date: 2024-01-01T01:01:01.010101+00:00
+id: 20240101010101
+---
+
+# Example Title Content
+
+<https://example.com>
+HEREDOC
+)"
+  }
+
+  run "${_NB}" export 1 "${_TMP_DIR}/example.html"
+
+  printf "\${status}: '%s'\\n" "${status}"
+  printf "\${output}: '%s'\\n" "${output}"
+
+  [[ "${status}"    ==  0               ]]
+
+  [[ ! -e "${_TMP_DIR}/example.html"    ]]
+
+  [[    "${output}" =~ YAML             ]]
+
+  [[ !  "${output}" =~ Exported         ]]
+  [[ !  "${output}" =~ Example\ File    ]]
+
+  {
+    "${_NB}" add                      \
+        --filename  "Example File.md" \
+        --content   "$(cat <<HEREDOC
+---
+title: "20240101010101 - Example Title Prefix: Example Title Content"
+public: true
+date: 2024-01-01T01:01:01.010101+00:00
+id: 20240101010101
+---
+
+# Example Title Content
+
+<https://example.com>
+HEREDOC
+)"
+  }
+
+  run "${_NB}" export 2 "${_TMP_DIR}/example.html"
+
+  printf "\${status}: '%s'\\n" "${status}"
+  printf "\${output}: '%s'\\n" "${output}"
+
+  [[ "${status}"    ==  0               ]]
+
+  cat "${_TMP_DIR}/example.html"
+
+  [[ -e "${_TMP_DIR}/example.html"      ]]
+  grep -q 'DOCTYPE html' "${_TMP_DIR}/example.html"
+
+  [[ !  "${output}" =~ YAML             ]]
+
+  [[    "${output}" =~ Exported         ]]
+  [[    "${output}" =~ Example\ File-1  ]]
+}
+
+# embedded resources ##########################################################
+
+@test "'export pandoc --self-contained' with reference to image in same directory embeds image." {
+  {
+    "${_NB}" init
+    "${_NB}" add                                                      \
+      --content   "# Export Example${_NEWLINE}${_NEWLINE}![](nb.png)" \
+      --filename  "Example File.md"
+
+    "${_NB}" import "${NB_TEST_BASE_PATH}/fixtures/nb.png"
+
+
+    [[ -f "${NB_DIR}/home/Example File.md"  ]]
+    [[ -f "${NB_DIR}/home/nb.png"           ]]
+  }
+
+  run "${_NB}" export pandoc 1 --self-contained <<< "y${_NEWLINE}"
+
+  printf "\${status}: '%s'\\n" "${status}"
+  printf "\${output}: '%s'\\n" "${output}"
+
+  [[ "${output}" =~ \<p\>\<img\ role=\"img\"\ src=\"data:image/png\;base64,iVBORw0KGgoAAAA ]]
+
+  run ! diff                      \
+    <(printf "%s\\n" "${output}") \
+    <(cat <<HEREDOC
+[WARNING] Could not fetch resource nb.png
+<h1 id="export-example">Export Example</h1>
+<p><img src="nb.png" /></p>
+HEREDOC
+    )
+}
+
+@test "'export --self-contained' with reference to image in same directory embeds image." {
+  {
+    "${_NB}" init
+    "${_NB}" add                                                      \
+      --content   "# Export Example${_NEWLINE}${_NEWLINE}![](nb.png)" \
+      --filename  "Example File.md"
+
+    "${_NB}" import "${NB_TEST_BASE_PATH}/fixtures/nb.png"
+
+
+    [[ -f "${NB_DIR}/home/Example File.md"  ]]
+    [[ -f "${NB_DIR}/home/nb.png"           ]]
+  }
+
+  run "${_NB}" export 1 "${_TMP_DIR}/example.html" --self-contained <<< "y${_NEWLINE}"
+
+  printf "\${status}: '%s'\\n" "${status}"
+  printf "\${output}: '%s'\\n" "${output}"
+
+  [[ "$(cat "${_TMP_DIR}/example.html")" =~ \<p\>\<img\ role=\"img\"\ src=\"data:image/png\;base64,iVBORw0KGgoAAAA ]]
+}
+
 # existing file ###############################################################
 
 @test "'export' with file at export path prompts user to confirm overwrite." {
@@ -157,7 +285,7 @@ load test_helper
   [[ "${output}" =~ sample.md   ]]
 }
 
-@test "'export' with valid <id> and <path> with diffferent file type converts." {
+@test "'export' with valid <id> and <path> to HTML file type converts." {
   {
     "${_NB}" init
     "${_NB}" add "# Export Example"
@@ -174,6 +302,30 @@ load test_helper
   [[ "${output}" =~ Exported        ]]
   [[ "${output}" =~ Export\ Example ]]
   [[ "${output}" =~ example.html    ]]
+}
+
+@test "'export' with valid <id> and <path> to docx file type converts." {
+  {
+    "${_NB}" init
+    "${_NB}" add --title "Export Example"
+  }
+
+  run "${_NB}" export 1 "${_TMP_DIR}/example.docx"
+
+  printf "\${status}: '%s'\\n" "${status}"
+  printf "\${output}: '%s'\\n" "${output}"
+
+  file "${_TMP_DIR}/example.docx"
+
+  [[ -e "${_TMP_DIR}/example.docx"                            ]]
+  [[ "$(file "${_TMP_DIR}/example.docx")" =~ Microsoft\ Word  ]]
+
+  # Prints output
+
+  [[ "${lines[0]}" =~ \
+^Exported:\ .*\[.*1.*\].*\ .*export_example\.md.*\ \"Export\ Example\"$ ]]
+  [[ "${lines[1]}" =~ \
+^To:\ \ \ \ \ \ \ \ .*${_TMP_DIR}/example.docx.*$                       ]]
 }
 
 # `notebook` ##################################################################

@@ -56,7 +56,7 @@ Sublime Text,
 and any other text editor you like,
 as well as terminal and GUI web browsers.
 `nb` works in any standard Linux / Unix environment,
-including macOS and Windows via WSL.
+including macOS and Windows via WSL, MSYS, and Cygwin.
 [Optional dependencies](#optional) can be installed to enhance functionality,
 but `nb` works great without them.
 
@@ -176,6 +176,7 @@ or dozens of notebooks containing thousands of notes, bookmarks, and other items
   - [Emacs](https://en.wikipedia.org/wiki/Emacs),
   - [Visual Studio Code](https://code.visualstudio.com/),
   - [Sublime Text](https://www.sublimetext.com/),
+  - [Helix](https://helix-editor.com/),
   - [micro](https://github.com/zyedidia/micro),
   - [nano](https://en.wikipedia.org/wiki/GNU_nano),
   - [Atom](https://atom.io/),
@@ -194,7 +195,7 @@ uses them to enhance the experience whenever they are available.
 Recommended:
 
 - [`bat`](https://github.com/sharkdp/bat)
-- [`ncat`](https://nmap.org/ncat/)
+- [`ncat`](https://nmap.org/ncat/) or [`socat`](https://www.kali.org/tools/socat/)
 - [`pandoc`](https://pandoc.org/)
 - [`rg`](https://github.com/BurntSushi/ripgrep)
 - [`tig`](https://github.com/jonas/tig)
@@ -208,20 +209,28 @@ Also supported for various enhancements:
 [The Silver Searcher (`ag`)](https://github.com/ggreer/the_silver_searcher),
 [`catimg`](https://github.com/posva/catimg),
 [Chafa](https://github.com/hpjansson/chafa),
-[`exa`](https://github.com/ogham/exa),
+[Chromium](https://www.chromium.org) / [Chrome](https://www.google.com/chrome/),
+[`eza`](https://github.com/eza-community/eza),
 [`ffplay`](https://ffmpeg.org/ffplay.html),
 [ImageMagick](https://imagemagick.org/),
+[`glow`](https://github.com/charmbracelet/glow),
 [GnuPG](https://en.wikipedia.org/wiki/GNU_Privacy_Guard),
 [`highlight`](http://www.andre-simon.de/doku/highlight/en/highlight.php),
 [`imgcat`](https://www.iterm2.com/documentation-images.html),
 [`joshuto`](https://github.com/kamiyaa/joshuto),
 [kitty's `icat` kitten](https://sw.kovidgoyal.net/kitty/kittens/icat.html),
+[`lowdown`](https://kristaps.bsd.lv/lowdown),
+[`lsd`](https://github.com/lsd-rs/lsd),
 [Links](https://en.wikipedia.org/wiki/Links_(web_browser)),
 [Lynx](https://en.wikipedia.org/wiki/Lynx_(web_browser)),
+[`mdcat`](https://github.com/swsnr/mdcat),
+[`mdless`](https://github.com/ttscoff/mdless),
+[`mdv`](https://github.com/axiros/terminal_markdown_viewer),
 [Midnight Commander (`mc`)](https://en.wikipedia.org/wiki/Midnight_Commander),
 [`mpg123`](https://en.wikipedia.org/wiki/Mpg123),
 [MPlayer](https://en.wikipedia.org/wiki/MPlayer),
-[ncat](https://nmap.org/ncat/),
+[`ncat`](https://nmap.org/ncat/),
+[`netcat`](https://netcat.sourceforge.net/),
 [note-link-janitor](https://github.com/andymatuschak/note-link-janitor)
 (via [plugin](https://github.com/xwmx/nb/blob/master/plugins/backlink.nb-plugin)),
 [`pdftotext`](https://en.wikipedia.org/wiki/Pdftotext),
@@ -230,7 +239,8 @@ Also supported for various enhancements:
 [readability-cli](https://gitlab.com/gardenappl/readability-cli),
 [`rga` / ripgrep-all](https://github.com/phiresky/ripgrep-all),
 [`sc-im`](https://github.com/andmarti1424/sc-im),
-[`term-image`](https://github.com/AnonymouX47/term-image),
+[`socat`](https://www.kali.org/tools/socat/),
+[`termvisage`](https://github.com/AnonymouX47/termvisage),
 [`termpdf.py`](https://github.com/dsanson/termpdf.py),
 [Tidy-Viewer (`tv`)](https://github.com/alexhallam/tv),
 [`timg`](https://github.com/hzeller/timg),
@@ -248,7 +258,7 @@ Installing `nb` with Homebrew also installs
 the recommended dependencies above
 and completion scripts for Bash, Zsh, and Fish.
 
-Install the latest development version from the respository with:
+Install the latest development version from the repository with:
 
 ```bash
 brew install xwmx/taps/nb --head
@@ -262,7 +272,7 @@ Installing it together with the `bash` formula is recommended:
 brew install nb bash
 ```
 
-#### Ubuntu, Windows WSL, and others
+#### Ubuntu, Windows, and others
 
 ##### npm
 
@@ -277,6 +287,10 @@ to install Bash and Zsh completion scripts (recommended).
 On Ubuntu and WSL, you can
 run [`sudo "$(which nb)" env install`](#env)
 to install the optional dependencies.
+
+When `nb` is installed on Windows,
+`socat` ([MSYS](https://packages.msys2.org/package/socat),
+[Cygwin](https://cygwin.com/packages/summary/socat.html)) is recommended.
 
 *`nb` is also available under its original package name,
 [notes.sh](https://www.npmjs.com/package/notes.sh),
@@ -832,7 +846,7 @@ and [AsciiDoc](https://asciidoc.org/)
 titles are recognized in `.org`,`.latex`, and `.asciidoc` / `.adoc` files:
 
 ```text
-#+TITLE: Example Org Title
+#+title: Example Org Title
 ```
 
 ```latex
@@ -1133,7 +1147,7 @@ NB_LIMIT set to 3
 ```
 
 List [#tagged](#tagging) items by passing `\#escaped` or `"#quoted"` hashtags
-or tags specified with the [`--tags`](#ls) option. Multiple tags perform an 
+or tags specified with the [`--tags`](#ls) option. Multiple tags perform an
 `AND` query:
 
 ```bash
@@ -1429,6 +1443,13 @@ which can be opened in your editor with [`nb settings edit`](#settings).
 
 Supported file types and tools include:
 
+- Markdown files ([`$NB_MARKDOWN_TOOL`](#nb_markdown_tool)):
+  - [`bat`](https://github.com/sharkdp/bat)
+  - [`glow`](https://github.com/charmbracelet/glow)
+  - [`lowdown`](https://kristaps.bsd.lv/lowdown)
+  - [`mdcat`](https://github.com/swsnr/mdcat)
+  - [`mdless`](https://github.com/ttscoff/mdless)
+  - [`mdv`](https://github.com/axiros/terminal_markdown_viewer)
 - PDF files:
   - [`termpdf.py`](https://github.com/dsanson/termpdf.py)
     with [kitty](https://sw.kovidgoyal.net/kitty/)
@@ -1446,12 +1467,13 @@ Supported file types and tools include:
   - [`imgcat`](https://www.iterm2.com/documentation-images.html) with
     [iTerm2](https://www.iterm2.com/)
   - [kitty's `icat` kitten](https://sw.kovidgoyal.net/kitty/kittens/icat.html)
-  - [`term-image`](https://github.com/AnonymouX47/term-image)
+  - [`termvisage`](https://github.com/AnonymouX47/termvisage)
   - [`timg`](https://github.com/hzeller/timg)
   - [`viu`](https://github.com/atanunq/viu)
 - Folders, Directories, Notebooks ([`$NB_DIRECTORY_TOOL`](#nb_directory_tool)):
-  - [`exa`](https://github.com/ogham/exa)
+  - [`eza`](https://github.com/eza-community/eza)
   - [`joshuto`](https://github.com/kamiyaa/joshuto)
+  - [`lsd`](https://github.com/lsd-rs/lsd)
   - [Midnight Commander (`mc`)](https://en.wikipedia.org/wiki/Midnight_Commander)
   - [`ranger`](https://ranger.github.io/)
   - [`vifm`](https://vifm.info/)
@@ -1676,7 +1698,7 @@ Items can be deleted within terminal and GUI web browsers using
 [4] example_file.md "Example Title"
 
               [delete]
- 
+
 ```
 
 For more information, see [Browsing](#-browsing).
@@ -1745,7 +1767,19 @@ with [`nb browse`](#browse).
 When [Pandoc](https://pandoc.org/) is installed,
 the HTML page content is converted to Markdown.
 When [readability-cli](https://gitlab.com/gardenappl/readability-cli)
-is installed, markup is cleaned up to focus on content.
+is installed, markup is cleaned up to focus on content. When
+[Chromium](https://www.chromium.org) or
+[Chrome](https://www.google.com/chrome/) is installed,
+JavaScript-dependent pages are rendered and the resulting markup is
+saved.
+
+Many shells automatically escape special characters in URLs. If a
+URL contains characters that are preventing it from being saved in full,
+URLs can also be enclosed in quotes when passed to `nb`:
+
+```bash
+nb "https://example.com#sample-anchor"
+```
 
 In addition to caching the page content,
 you can also include a quote from the page in a
@@ -1915,6 +1949,16 @@ nb https://example.com --encrypt
 
 Encrypted bookmarks require a password before they can be viewed or
 opened.
+
+Multiple URLs can be bookmarked with a single command by passing
+multiple [`<url>`](#bookmark) arguments. Additional arguments will be reused
+for each bookmark:
+
+```bash
+❯ nb https://example.com https://example.net --tags tag1,tag2 --filename example
+Added: [1] 🔖 example.bookmark.md "Example Domain (example.com)"
+Added: [2] 🔖 example-1.bookmark.md "Example Domain (example.net)"
+```
 
 #### Listing and Filtering Bookmarks
 
@@ -2259,7 +2303,7 @@ See [`bookmark help`](#bookmark-help) for more information.
   </sup>
 </p>
 
-Use [`nb todo`](#todo) (shortcut: [`nb t`](#todo))
+Use [`nb todo`](#todo) (shortcut: [`nb to`](#todo))
 to create, list, and update todos.
 `nb` todos are [structured Markdown documents](#nb-markdown-todo-file-format)
 referencing a single primary todo,
@@ -2362,7 +2406,7 @@ Added: [5] ✔️ [ ] Example todo five.
 
 [Tags](#-tagging), [links](#-linking), and URLs can be
 [browsed](#-browsing)
-in terminal and GUI web browers with [`nb browse`](#browse).
+in terminal and GUI web browsers with [`nb browse`](#browse).
 
 #### Listing Todos
 
@@ -3177,7 +3221,7 @@ to delete an item:
 [4] example_file.md "Example Title"
 
               [delete]
- 
+
 ```
 
 #### `browse` Search
@@ -3288,16 +3332,25 @@ and enable the Ace editor in
 #### `browse` Portability
 
 [`nb browse`](#browse) depends on
-[`ncat`](https://nmap.org/ncat/), which is available as part of
-the `ncat` or `nmap` package in most package managers, and
-[`pandoc`](https://pandoc.org/).
-When only `pandoc` is available, the current note is rendered and
+either [`socat`](https://www.kali.org/tools/socat/)
+or
+[`ncat`](https://nmap.org/ncat/) (available as part of
+the `ncat` or `nmap` package in most package managers) and
+[`pandoc`](https://pandoc.org/). When neither `socat` nor `ncat` is
+available and the Bash version is 5.2 or higher, [`nb browse`](#browse)
+falls back to a pure Bash implementation that supports all features
+except the Ace editor. When only `pandoc` is available,
+the current note is rendered and
 <a href="#-linking">[[wiki-style links]]</a>
 go to unrendered, original files.
-If only `ncat` is available,
+When `socat`,`ncat`, or Bash 5.2+ is available without `pandoc`,
 files in plain text formats are rendered with the original markup unconverted.
-If neither `ncat` nor `pandoc` is available,
+If neither `ncat`, `socat`, Bash 5.2+, nor `pandoc` is available,
 [`nb browse`](#browse) falls back to the default behavior of [`nb show`](#show).
+
+When `nb` is installed on Windows,
+`socat` ([MSYS](https://packages.msys2.org/package/socat),
+[Cygwin](https://cygwin.com/packages/summary/socat.html)) is recommended.
 
 #### `browse` Privacy
 
@@ -3305,7 +3358,8 @@ If neither `ncat` nor `pandoc` is available,
 from the CSS and JavaScript
 all the way down through the HTTP request parsing and response building,
 with no imports, libraries, frameworks, or third-party code
-outside of the few binary dependencies (`bash`, `git`, `ncat`, `pandoc`),
+outside of the few binary dependencies
+(`bash`, `git`, `ncat` / `socat`, `pandoc`),
 the Linux / Unix environment,
 and the optional [Ace editor](#ace-editor).
 
@@ -3443,7 +3497,7 @@ supported tools and configurations, including:
 - [`imgcat`](https://www.iterm2.com/documentation-images.html) with
   [iTerm2](https://www.iterm2.com/)
 - [kitty's `icat` kitten](https://sw.kovidgoyal.net/kitty/kittens/icat.html)
-- [`term-image`](https://github.com/AnonymouX47/term-image)
+- [`termvisage`](https://github.com/AnonymouX47/termvisage)
 - [`timg`](https://github.com/hzeller/timg)
 - [`viu`](https://github.com/atanunq/viu)
 
@@ -3757,7 +3811,7 @@ To bump an item to the top of the list without pinning, use the
 
 Use [`nb search`](#search) (shortcut: [`nb q`](#search)) to
 perform full text searches, with support for regular expressions,
-[#tags](#-tagging), and both `AND` and `OR` queries:
+[#tags](#-tagging), and `AND`, `OR`, and `NOT` queries:
 
 ```bash
 # search current notebook for "example query"
@@ -3783,6 +3837,9 @@ nb search "example|sample"
 
 # search for "example" OR "sample" with option
 nb search "example" --or "sample"
+
+# search for items matching both "Example" AND "Sample", and NOT "Demo"
+nb search "Example" --and "Sample" --not "Demo"
 
 # search items containing the hashtag "#example"
 nb search "#example"
@@ -3869,6 +3926,18 @@ nb q "example" --or "sample"
 ```bash
 nb q "example" --or "sample" --and "demo"
 # equivalent: example|sample AND demo|sample
+```
+
+`NOT` queries exclude items that match the specified query and are
+specified with [`--not <query>`](#search), which can be used with
+`--and` and `--or`:
+
+```bash
+# search for items that match "Example", excluding items that also match "Sample"
+nb search "Example" --not "Sample"
+
+# search for items matching both "Example" AND "Sample", and NOT "Demo"
+nb search "Example" --and "Sample" --not "Demo"
 ```
 
 Search for [#tags](#-tagging) with flexible
@@ -4914,7 +4983,7 @@ to download the original file:
 ❯nb · home : 123 · ↓ | +
 
     example.pdf
- 
+
 ```
 
 ### ⚙️ `set` & `settings`
@@ -4959,6 +5028,7 @@ the setting name or number to [`nb set`](#settings):
          atom
          code
          emacs
+         hx
          macdown
          mate
          micro
@@ -5479,7 +5549,7 @@ Notebooks are identified by the notebook name followed by a colon.
 Folder and item identifiers without a notebook name refer to
 items within the current notebook.
 When a selector consists of notebook name and colon
-with no folder path or item identifer,
+with no folder path or item identifier,
 the command runs in the root folder of the notebook:
 
 ```bash
@@ -5539,7 +5609,7 @@ selector refers to the folder itself:
 
 For more information about folders, see [Folders](#-folders).
 
-An item is identified by id, filename, or title, optionally preceeded by
+An item is identified by id, filename, or title, optionally preceded by
 notebook name or folder path:
 
 ```bash
@@ -5875,7 +5945,7 @@ Usage:
   nb add todo [<todo-options>...]
   nb archive [<notebook>]
   nb bookmark [<ls-options>...]
-  nb bookmark [<notebook>:][<folder-path>/] <url>
+  nb bookmark [<notebook>:][<folder-path>/] <url>...
               [-c <comment> | --comment <comment>] [--edit] [-e | --encrypt]
               [-f <filename> | --filename <filename>] [--no-request]
               [-q <quote> | --quote <quote>] [--save-source]
@@ -5885,7 +5955,7 @@ Usage:
   nb bookmark (open | peek | url) (<id> | <filename> | <path> | <title>)
   nb bookmark (edit | delete) (<id> | <filename> | <path> | <title>)
   nb bookmark search <query>
-  nb browse [<notebook>:][<folder-path>/][<id> | <filename> | <title>]
+  nb browse [<notebook>:][<folder-path>/][<id> | <filename> | <title>] [--daemon]
             [-g | --gui] [-n | --notebooks] [-p | --print] [-q | --query <query>]
             [-s | --serve] [-t <tag> | --tag <tag> | --tags <tag1>,<tag2>...]
   nb browse add [<notebook>:][<folder-path>/][<filename>]
@@ -5922,16 +5992,17 @@ Usage:
   nb init [<remote-url> [<branch>]] [--author] [--email <email>]
           [--name <name>]
   nb list [-e [<length>] | --excerpt [<length>]] [--filenames]
-          [-n <limit> | --limit <limit> | --<limit>] [--no-id]
-          [--no-indicator] [-p <number> | --page <number>] [--pager]
+          [-f | --folders-first] [-n <limit> | --limit <limit> | --<limit>]
+          [--no-id] [--no-indicator] [-p <number> | --page <number>] [--pager]
           [--paths] [-s | --sort] [-r | --reverse] [--tags]
           [-t <type> | --type <type> | --<type>]
           [<notebook>:][<folder-path>/][<id> | <filename> | <path> | <query>]
   nb ls [-a | --all] [-b | --browse] [-e [<length>] | --excerpt [<length>]]
-        [--filenames] [-g | --gui] [-n <limit> | --limit <limit> | --<limit>]
-        [--no-footer] [--no-header] [--no-id] [--no-indicator]
-        [-p <number> | --page <number>] [--pager] [--paths] [-s | --sort]
-        [-r | --reverse] [--tags] [-t <type> | --type <type> | --<type>]
+        [--filenames] [-f | --folders-first] [-g | --gui]
+        [-n <limit> | --limit <limit> | --<limit>] [--no-footer] [--no-header]
+        [--no-id] [--no-indicator] [-p <number> | --page <number>] [--pager]
+        [--paths] [-s | --sort] [-r | --reverse] [--tags]
+        [-t <type> | --type <type> | --<type>]
         [<notebook>:][<folder-path>/][<id> | <filename> | <path> | <query>]
   nb move ([<notebook>:][<folder-path>/][<id> | <filename> | <title>])
           ([<notebook>:][<path>] | --reset | --to-bookmark | --to-note |
@@ -5964,7 +6035,7 @@ Usage:
   nb remote set <url> [<branch-name>]
   nb run <command> [<arguments>...]
   nb search ([<notebook>:][<folder-path>/][<id> | <filename> | <title>])
-            <query>... [-a | --all] [--and <query>] [--or <query>]
+            <query>... [-a | --all] [--and <query>] [--not <query>] [--or <query>]
             [-l | --list] [--path] [-t <tag1>,<tag2>... | --tag <tag1>,<tag2>...]
             [-t | --tags] [--type <type> | --<type>] [--utility <name>]
   nb set [<name> [<value>] | <number> [<value>]]
@@ -5986,12 +6057,12 @@ Usage:
   nb todo add [<notebook>:][<folder-path>/][<filename>] <title>
               [--description <description>] [--due <date>]
               [-r (<url> | <selector>) | --related (<url> | <selector>)]
-              [--tags <tag1>,<tag2>...] [--task <title>]...
+              [--tags <tag1>,<tag2>...] [--task <title>...]
   nb todo do   ([<notebook>:][<folder-path>/][<id> | <filename> | <description>])
                [<task-number>]
   nb todo undo ([<notebook>:][<folder-path>/][<id> | <filename> | <description>])
                [<task-number>]
-  nb todos [<notebook>:][<folder-path>/] [open | closed]
+  nb todos [<notebook>:][<folder-path>/] [open | closed] [--tags <tag1>,<tag2>...]
   nb todos tasks ([<notebook>:][<folder-path>/][<id> | <filename> | <description>])
                  [open | closed]
   nb unarchive [<notebook>]
@@ -6379,7 +6450,7 @@ Shortcut Alias:
 ```text
 Usage:
   nb bookmark [<ls-options>...]
-  nb bookmark [<notebook>:][<folder-path>/] <url>
+  nb bookmark [<notebook>:][<folder-path>/] <url>...
               [-c <comment> | --comment <comment>] [--edit] [-e | --encrypt]
               [-f <filename> | --filename <filename>] [--no-request]
               [-q <quote> | --quote <quote>] [--save-source]
@@ -6495,7 +6566,7 @@ Shortcut Aliases:
 
 ```text
 Usage:
-  nb browse [<notebook>:][<folder-path>/][<id> | <filename> | <title>]
+  nb browse [<notebook>:][<folder-path>/][<id> | <filename> | <title>] [--daemon]
             [-g | --gui] [-n | --notebooks] [-p | --print] [-q | --query <query>]
             [-s | --serve] [-t <tag> | --tag <tag> | --tags <tag1>,<tag2>...]
   nb browse add [<notebook>:][<folder-path>/][<filename>]
@@ -6515,11 +6586,12 @@ Subcommands:
 
 Options:
   -c, --content <content>      Add content to the new note.
+  --daemon                     Start the web server. Close with <CTRL-C>.
   -g, --gui                    Open in the system's primary GUI web browser.
   -n, --notebooks              Browse notebooks.
   -p, --print                  Print to standard output.
   -q, --query <query>          Open to the search results for <query>.
-  -s, --serve                  Start the web application server.
+  -s, --serve                  Start the web server. Close with any key.
   -t, --tag <tag>              Search for a tag.
   --tags <tag1>,<tag2>...      A comma-separated list of tags.
   -t, --title <title>          Add a title to the new note.
@@ -6544,12 +6616,13 @@ Description:
     [[demo:Example Title]]
 
   `browse` supports `w3m` [1] and `links` [2], and depends on
-  `ncat` [3] and `pandoc` [4]:
+  `ncat` [3] or `socat` [4] and `pandoc` [5]:
 
     1. https://en.wikipedia.org/wiki/W3m
     2. https://en.wikipedia.org/wiki/Links_(web_browser)
     3. https://nmap.org/ncat/
-    4. https://pandoc.org/
+    4. https://www.kali.org/tools/socat/
+    5. https://pandoc.org/
 
 Read More:
   https://github.com/xwmx/nb#-browsing
@@ -7131,8 +7204,8 @@ Examples:
 ```text
 Usage:
   nb list [-e [<length>] | --excerpt [<length>]] [--filenames]
-          [-n <limit> | --limit <limit> | --<limit>] [--no-id]
-          [--no-indicator] [-p <number> | --page <number>] [--pager]
+          [-f | --folders-first] [-n <limit> | --limit <limit> | --<limit>]
+          [--no-id] [--no-indicator] [-p <number> | --page <number>] [--pager]
           [--paths] [-s | --sort] [-r | --reverse] [--tags]
           [-t <type> | --type <type> | --<type>]
           [<notebook>:][<folder-path>/][<id> | <filename> | <path> | <query>]
@@ -7141,6 +7214,7 @@ Options:
   -e, --excerpt [<length>]        Print an excerpt <length> lines long under
                                   each note's filename [default: 3].
   --filenames                     Print the filename for each note.
+  -f, --folders-first             Print folders before other items.
   -n, --limit <limit>, --<limit>  The maximum number of notes to list.
   --no-id                         Don't include the id in list items.
   --no-indicator                  Don't include the indicator in list items.
@@ -7208,10 +7282,11 @@ Examples:
 ```text
 Usage:
   nb ls [-a | --all] [-b | --browse] [-e [<length>] | --excerpt [<length>]]
-        [--filenames] [-g | --gui] [-n <limit> | --limit <limit> | --<limit>]
-        [--no-footer] [--no-header] [--no-id] [--no-indicator]
-        [-p <number> | --page <number>] [--pager] [--paths] [-s | --sort]
-        [-r | --reverse] [--tags] [-t <type> | --type <type> | --<type>]
+        [--filenames] [-f | --folders-first] [-g | --gui]
+        [-n <limit> | --limit <limit> | --<limit>] [--no-footer] [--no-header]
+        [--no-id] [--no-indicator] [-p <number> | --page <number>] [--pager]
+        [--paths] [-s | --sort] [-r | --reverse] [--tags]
+        [-t <type> | --type <type> | --<type>]
         [<notebook>:][<folder-path>/][<id> | <filename> | <path> | <query>]
 
 Options:
@@ -7222,6 +7297,7 @@ Options:
   -e, --excerpt [<length>]        Print an excerpt <length> lines long under
                                   each note's filename [default: 3].
   --filenames                     Print the filename for each note.
+  -f, --folders-first             Print folders before other items.
   -g, --gui                       Open the specified item or current notebook
                                   with `browse` in a GUI web browser.
   -n, --limit <limit>, --<limit>  The maximum number of listed items.
@@ -7423,7 +7499,7 @@ Options:
 Subcommands:
   (default)  List notebooks.
   add        Create a new global notebook. When <remote-url> is specified,
-             create one ore more new global notebook by cloning selected
+             create one or more new global notebook by cloning selected
              or specified <branch>es from <remote-url>.
              Aliases: `nb notebooks create`, `nb notebooks new`
   archive    Set the current notebook or notebook <name> to "archived" status.
@@ -7441,7 +7517,8 @@ Subcommands:
              Shortcut Alias: `o`
   peek       Open the current notebook directory or notebook <name> in the
              first tool found in the following list:
-             `ranger` [1], `mc` [2], `vifm` [3], `joshuto` [4], `exa` [5], or `ls`.
+             `ranger` [1], `mc` [2], `vifm` [3], `joshuto` [4], `lsd` [5],
+             `eza` [6], or `ls`.
              Shortcut Alias: `p`
   rename     Rename a notebook. Aliases: `move`, `mv`
   select     Set the current notebook from a colon-prefixed selector.
@@ -7456,7 +7533,8 @@ Subcommands:
     2. https://en.wikipedia.org/wiki/Midnight_Commander
     3. https://vifm.info/
     4. https://github.com/kamiyaa/joshuto
-    5. https://github.com/ogham/exa
+    5. https://github.com/lsd-rs/lsd
+    6. https://github.com/eza-community/eza
 
 Description:
   Manage notebooks.
@@ -7550,13 +7628,14 @@ Description:
   format or any other file type, `peek` is the equivalent of `show`. When
   used with a notebook, `peek` opens the notebook folder first tool found in
   the following list: `ranger` [1], `mc` [2], `vifm` [3], `joshuto` [4],
-  `exa` [5], or `ls`.
+  `lsd` [5], eza` [6], or `ls`.
 
     1. https://ranger.github.io/
     2. https://en.wikipedia.org/wiki/Midnight_Commander
     3. https://vifm.info/
     4. https://github.com/kamiyaa/joshuto
-    5. https://github.com/ogham/exa
+    5. https://github.com/lsd-rs/lsd
+    6. https://github.com/eza-community/eza
 
 Read More:
   https://github.com/xwmx/nb#viewing-bookmarks
@@ -7737,7 +7816,7 @@ Examples:
 ```text
 Usage:
   nb search ([<notebook>:][<folder-path>/][<id> | <filename> | <title>])
-            <query>... [-a | --all] [--and <query>] [--or <query>]
+            <query>... [-a | --all] [--and <query>] [--not <query>] [--or <query>]
             [-l | --list] [--path] [-t <tag1>,<tag2>... | --tag <tag1>,<tag2>...]
             [-t | --tags] [--type <type> | --<type>] [--utility <name>]
 
@@ -7746,14 +7825,15 @@ Options:
   --and <query>                 Add a AND query.
   -l, --list                    Print the id, filename, and title listing for
                                 each matching file, without the excerpt.
-  --or <query>                  Add an OR query.
+  --not <query>                 Add a NOT query.
+  --or  <query>                 Add an OR query.
   --path                        Print the full path for each matching file.
   -t, --tag <tag1>,<tag2>...    A comma-separated list of tags.
   -t, --tags                    List all tags found in the notebook.
   --type <type>, --<type>       Search items of <type>. <type> can be a file
                                 extension or one of the following types:
-                                note, bookmark, document, archive, image,
-                                video, audio, folder, text
+                                archive, audio, book, bookmark, document,
+                                folder, image, note, text, video
   --utility <name>              The name of the search utility to search with.
 
 Description:
@@ -7762,7 +7842,8 @@ Description:
   Multiple query arguments are treated as AND queries, returning items that
   match all queries. AND queries can also be specified with the --and <query>
   option. The --or <query> option can be used to specify an OR query,
-  returning items that match at least one of the queries.
+  returning items that match at least one of the queries. --not <query>
+  excludes items matching <query>.
 
   `nb search` is powered by Git's built-in `git grep` tool. `nb` also
   supports performing searches with alternative search tools using the
@@ -7800,6 +7881,9 @@ Examples:
   # search for items matching "Example" OR "Sample"
   nb search "Example|Sample"
   nb search "Example" --or "Sample"
+
+  # search for items matching both "Example" AND "Sample", and NOT "Demo"
+  nb search "Example" --and "Sample" --not "Demo"
 
   # search with a regular expression
   nb search "\d\d\d-\d\d\d\d"
@@ -7984,6 +8068,7 @@ Alias:
          atom
          code
          emacs
+         hx
          macdown
          mate
          micro
@@ -8445,12 +8530,13 @@ Usage:
   nb todo add [<notebook>:][<folder-path>/][<filename>] <title>
               [--description <description>] [--due <date>]
               [-r (<url> | <selector>) | --related (<url> | <selector>)]
-              [--tags <tag1>,<tag2>...] [--task <title>]...
+              [--tags <tag1>,<tag2>...] [--task <title>...]
+  nb todo delete ([<notebook>:][<folder-path>/][<id> | <filename> | <title>])
   nb todo do   ([<notebook>:][<folder-path>/][<id> | <filename> | <description>])
                [<task-number>]
   nb todo undo ([<notebook>:][<folder-path>/][<id> | <filename> | <description>])
                [<task-number>]
-  nb todos [<notebook>:][<folder-path>/] [open | closed]
+  nb todos [<notebook>:][<folder-path>/] [open | closed] [--tags <tag1>,<tag2>...]
   nb todos tasks ([<notebook>:][<folder-path>/][<id> | <filename> | <description>])
                  [open | closed]
 
@@ -8465,6 +8551,8 @@ Subcommands:
   (default)   List todos.
   add         Add a new todo.
               Shortcut Aliases: `nb todo a`, `nb todo +`
+  delete      Delete a todo.
+              Shortcut Aliases: `nb todo -`
   do          Mark a todo or task as done.
   tasks       List tasks in todos, notebooks, folders, and other item.
   undo        Unmark a todo or task as done.
@@ -8494,7 +8582,7 @@ Alias:
   nb todos
 
 Shortcut Alias:
-  nb t
+  nb to
 ```
 
 #### `unarchive`
@@ -8706,6 +8794,7 @@ See Also:
   <a href="#backlink">backlink</a>&nbsp;·
   <a href="#bump">bump</a>&nbsp;·
   <a href="#clip">clip</a>&nbsp;·
+  <a href="#daily">daily</a>&nbsp;·
   <a href="#ebook">ebook</a>&nbsp;·
   <a href="#example">example</a>&nbsp;·
   <a href="#weather">weather</a>
@@ -8811,6 +8900,40 @@ Examples:
 
   # save the clipboard contents as a new `.cr` file in the "snippets" notebook
   nb snippets:clip .cr
+```
+
+#### `daily`
+
+[↑&nbsp;](#plugin-help)
+
+##### Install
+
+```bash
+nb plugins install https://github.com/xwmx/nb/blob/master/plugins/daily.nb-plugin
+```
+
+##### Help
+
+```text
+Usage:
+  nb daily [<content>] [--prev [<number>]]
+
+Options:
+  --prev [<number>]   List previous days and show day by previous <number>.
+
+Description:
+  Add notes to a daily log. When called without arguments, the current day's
+  log is displayed. When passed `<content>`, a new timestamped entry is added
+  to the current day's log, which is created if it doesn't yet exist.
+
+  Previous day's logs can be listed with the `--prev` option. View a previous
+  day's log by passing its `<number>` in the list.
+
+Examples:
+  nb daily "Example note content."
+  nb daily
+  nb daily --prev
+  nb daily --prev 3
 ```
 
 #### `ebook`
@@ -8946,15 +9069,24 @@ Shortcut Alias:
     <a href="#nb_ace_keyboard"><code>$NB_ACE_KEYBOARD</code></a>&nbsp;·
     <a href="#nb_audio_tool"><code>$NB_AUDIO_TOOL</code></a>&nbsp;·
     <a href="#nb_auto_sync"><code>$NB_AUTO_SYNC</code></a>&nbsp;·
+    <a href="#nb_browse_markdown_reader"><code>$NB_BROWSE_MARKDOWN_READER</code></a>&nbsp;·
+    <a href="#nb_browse_server_tool"><code>$NB_BROWSE_SERVER_TOOL</code></a>&nbsp;·
+    <a href="#nb_browse_support_links"><code>$NB_BROWSE_SUPPORT_LINKS</code></a>&nbsp;·
     <a href="#nb_browser"><code>$NB_BROWSER</code></a>&nbsp;·
     <a href="#nb_color_primary"><code>$NB_COLOR_PRIMARY</code></a>&nbsp;·
     <a href="#nb_color_secondary"><code>$NB_COLOR_SECONDARY</code></a>&nbsp;·
     <a href="#nb_color_theme"><code>$NB_COLOR_THEME</code></a>&nbsp;·
+    <a href="#nb_custom_css"><code>$NB_CUSTOM_CSS</code></a>&nbsp;·
+    <a href="#nb_custom_css_url"><code>$NB_CUSTOM_CSS_URL</code></a>&nbsp;·
+    <a href="#nb_custom_javascript"><code>$NB_CUSTOM_JAVASCRIPT</code></a>&nbsp;·
+    <a href="#nb_custom_javascript_url"><code>$NB_CUSTOM_JAVASCRIPT_URL</code></a>&nbsp;·
     <a href="#nb_data_tool"><code>$NB_DATA_TOOL</code></a>&nbsp;·
     <a href="#nb_default_extension"><code>$NB_DEFAULT_EXTENSION</code></a>&nbsp;·
     <a href="#nb_dir-1"><code>$NB_DIR</code></a>&nbsp;·
     <a href="#nb_directory_tool"><code>$NB_DIRECTORY_TOOL</code></a>&nbsp;·
+    <a href="#nb_editor"><code>$NB_EDITOR</code></a>&nbsp;·
     <a href="#nb_encryption_tool"><code>$NB_ENCRYPTION_TOOL</code></a>&nbsp;·
+    <a href="#nb_folders_first"><code>$NB_FOLDERS_FIRST</code></a>&nbsp;·
     <a href="#nb_footer"><code>$NB_FOOTER</code></a>&nbsp;·
     <a href="#nb_gui_browser"><code>$NB_GUI_BROWSER</code></a>&nbsp;·
     <a href="#nb_header"><code>$NB_HEADER</code></a>&nbsp;·
@@ -8972,6 +9104,7 @@ Shortcut Alias:
     <a href="#nb_indicator_video"><code>$NB_INDICATOR_VIDEO</code></a>&nbsp;·
     <a href="#nb_limit"><code>$NB_LIMIT</code></a>&nbsp;·
     <a href="#nb_mathjax_enabled"><code>$NB_MATHJAX_ENABLED</code></a>&nbsp;·
+    <a href="#nb_markdown_tool"><code>$NB_MARKDOWN_TOOL</code></a>&nbsp;·
     <a href="#nb_pinned_pattern"><code>$NB_PINNED_PATTERN</code></a>&nbsp;·
     <a href="#nb_server_host"><code>$NB_SERVER_HOST</code></a>&nbsp;·
     <a href="#nb_server_port"><code>$NB_SERVER_PORT</code></a>&nbsp;·
@@ -9011,6 +9144,10 @@ export NB_INDICATOR_PINNED="🔮"
 
 ```text
 The terminal editor command for editing items.
+
+See also: `$NB_EDITOR`
+
+Example Values: 'code', 'emacs', 'hx', 'vim'
 ```
 
 <p>
@@ -9118,6 +9255,60 @@ When set to '1', each `_git checkpoint()` call will automativally run
   </sup>
 </p>
 
+##### `$NB_BROWSE_MARKDOWN_READER`
+
+```text
+$NB_BROWSE_MARKDOWN_READER
+
+Default: 'markdown+emoji+raw_html+east_asian_line_breaks'
+
+The Pandoc reader, including extensions, to use for converting Markdown to
+HTML in `nb browse`.
+
+More information:
+  https://pandoc.org/MANUAL.html#extensions
+  https://pandoc.org/MANUAL.html#general-options-1
+```
+
+<p>
+  <sup>
+    <a href="#-variables">↑</a>
+  </sup>
+</p>
+
+##### `$NB_BROWSE_SERVER_TOOL`
+
+```text
+Default: first available: 'ncat', 'socat', 'netcat', 'bash' (5.2+ only), ''
+
+The tool used to listen on the server host and port and respond to
+incoming requests.
+
+Supported Values: 'accept', 'bash', 'nc', 'ncat', netcat', 'socat'
+```
+
+<p>
+  <sup>
+    <a href="#-variables">↑</a>
+  </sup>
+</p>
+
+##### `$NB_BROWSE_SUPPORT_LINKS`
+
+```text
+Default: '1'
+
+Set to '0' to hide the 'Donate' and 'Sponsor' links in `nb browse`.
+
+Supported Values: '0' '1'
+```
+
+<p>
+  <sup>
+    <a href="#-variables">↑</a>
+  </sup>
+</p>
+
 ##### `$NB_BROWSER`
 
 ```text
@@ -9140,6 +9331,7 @@ Default: Value depends on terminal capabilities.
 Set highlighting color. This should be set to an xterm color number, usually
 a value between 1 and 256. For a table of common colors and their numbers
 run:
+
   nb settings colors
 
 Supported Values: [0..255+]
@@ -9159,6 +9351,7 @@ Default: '8'
 Color for lines and other accents. This should be set to an xterm color
 number, usually a value between 1 and 256. For a table of common colors and
 their numbers, run:
+
   nb settings colors
 
 Supported Values: [0..255+]
@@ -9176,6 +9369,66 @@ Supported Values: [0..255+]
 Default: 'nb'
 
 The color theme.
+```
+
+<p>
+  <sup>
+    <a href="#-variables">↑</a>
+  </sup>
+</p>
+
+##### `NB_CUSTOM_CSS`
+
+```text
+Default: ''
+
+A style sheet to be included inline in a `<style>` element on pages
+rendered by `nb browse`.
+```
+
+<p>
+  <sup>
+    <a href="#-variables">↑</a>
+  </sup>
+</p>
+
+##### `NB_CUSTOM_CSS_URL`
+
+```text
+Default: ''
+
+A URL to a style sheet to be included in a `<link rel="stylesheet">`
+element on pages rendered by `nb browse`.
+```
+
+<p>
+  <sup>
+    <a href="#-variables">↑</a>
+  </sup>
+</p>
+
+##### `NB_CUSTOM_JAVASCRIPT`
+
+```text
+Default: ''
+
+A block of JavaScript code to be included inline in a `<script>` element
+on pages rendered by `nb browse`.
+```
+
+<p>
+  <sup>
+    <a href="#-variables">↑</a>
+  </sup>
+</p>
+
+##### `NB_CUSTOM_JAVASCRIPT_URL`
+
+```text
+Default: ''
+
+A URL to a JavaScript file to be included in a `<script src=//url>`
+element on pages rendered by `nb browse`.
 ```
 
 <p>
@@ -9240,12 +9493,48 @@ Example Values: 'ranger', 'mc'
   </sup>
 </p>
 
+##### `$NB_EDITOR`
+
+```text
+Default: the value of `$EDITOR`
+
+The terminal editor command for editing items. Overrides the value of
+`$EDITOR` in the environment.
+
+See also: `$EDITOR`
+
+Example Values: 'code', 'emacs', 'hx', 'vim'
+```
+
+<p>
+  <sup>
+    <a href="#-variables">↑</a>
+  </sup>
+</p>
+
 ##### `$NB_ENCRYPTION_TOOL`
 
 ```text
 Default: 'openssl'
 
 Supported Values: 'gpg' 'openssl'
+```
+
+<p>
+  <sup>
+    <a href="#-variables">↑</a>
+  </sup>
+</p>
+
+##### `$NB_FOLDERS_FIRST`
+
+```text
+Default: '0'
+
+When set to '1', folders are printed before other items in `nb`, `nb ls`,
+and `nb browse`.
+
+Supported Values: '0' '1'
 ```
 
 <p>
@@ -9474,6 +9763,20 @@ Example Values:
 Default: '0'
 
 Example Values: '0', '1'
+```
+
+<p>
+  <sup>
+    <a href="#-variables">↑</a>
+  </sup>
+</p>
+
+##### `$NB_MARKDOWN_TOOL`
+
+```text
+Default: '' (default pager)
+
+Supported Values: 'bat', 'glow', 'lowdown', 'mdcat', 'mdless', 'mdv'
 ```
 
 <p>
@@ -10013,6 +10316,7 @@ so ids are preserved across systems.
 Usage:
   nb index add <filename>
   nb index delete <filename>
+  nb index edit
   nb index get_basename <id>
   nb index get_id <filename>
   nb index get_max_id
@@ -10031,6 +10335,7 @@ Options:
 Subcommands:
   add           Add <filename> to the index.
   delete        Delete <filename> from the index.
+  edit          Open the index file in `$EDITOR`.
   get_basename  Print the filename / basename at the specified <id>.
   get_id        Get the id for <filename>.
   get_max_id    Get the maximum id for the folder.
@@ -10089,7 +10394,7 @@ at the root level of the notebook directory.
 
 ## Tests
 
-With more than 2,000 tests spanning tens of thousands of lines,
+With more than 2,200 tests spanning tens of thousands of lines,
 `nb` is really mostly a
 [test suite](https://github.com/xwmx/nb/tree/master/test).
 Tests run continuously [via GitHub Actions](https://github.com/xwmx/nb/actions)
