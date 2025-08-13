@@ -693,6 +693,79 @@ Encrypted notes can be decrypted
 using the OpenSSL and GPG command line tools directly, so
 you aren't dependent on `nb` to decrypt your files.
 
+##### Templates
+
+Create a note based on a template by assigning a template string
+or path to a template file with [`add --template <template>`](#add):
+
+<!-- {% raw %} -->
+```bash
+# create a new note based on a template specified by path
+nb add --template /path/to/example/template
+
+# create a new note based on a template defined as a string
+nb add --template "{{title}} • {{content}}"
+```
+<!-- {% endraw %} -->
+
+`nb` template tags are enclosed in double curly brackets.
+Supported tags include:
+
+<dl>
+  <dt><code>&#x007B;{title}}</code></dt>
+  <dd>The note title, as specified with
+  <a href="#add"><code>add --title &#60;title></code></a></dd>
+  <dt><code>&#x007B;&#x007B;tags}}</code></dt>
+  <dd>A list of hashtags, as specified with
+  <a href="#add"><code>add --tags &#60;tag1>,&#60;tag2></code></a></dd>
+  <dt><code>&#x007B;{content}}</code></dt>
+  <dd>The note content, as specified with
+  <a href="#add"><code>add &#60;content></code></a>,
+  <a href="#add"><code>add --content &#60;content></code></a>,
+  and piped content.</dd>
+  <dt><code>&#x007B;{date}}</code></dt>
+  <dd>The ouput of the system's <code>date</code> command. Use the
+  <a href="https://man7.org/linux/man-pages/man1/date.1.html"><code>date</code>
+  command options</a> to control formatting, e.g.,
+  <code>&#x007B;{date +"%Y-%m-%d"}}</code>.
+ </dd>
+</dl>
+
+An example complete markdown template could look like the following:
+
+<!-- {% raw %} -->
+```
+# {{title}}
+
+{{date +"%Y-%m-%d"}}
+
+{{tags}}
+
+{{content}}
+```
+<!-- {% endraw %} -->
+
+Templates are Bash strings processed with `eval`, so you can use
+command substitution (`$(echo "Example command")`) to include
+the output from command line tools and shell code.
+
+A default template can be configured by assigning a string or path
+to the [`$NB_DEFAULT_TEMPLATE`](#nb_default_template) variable
+in your `~/.nbrc` file:
+
+<!-- {% raw %} -->
+```bash
+# set the default template to a path
+export NB_DEFAULT_TEMPLATE="/path/to/example/template"
+
+# set the default template with a string
+export NB_DEFAULT_TEMPLATE="{{title}} • {{content}}"
+```
+<!-- {% endraw %} -->
+
+Use [`nb add --no-template`](#add) to skip using a template when
+one is assigned.
+
 ##### Shortcut Aliases: `nb a`, `nb +`
 
 `nb` includes shortcuts for many commands, including
@@ -1775,9 +1848,9 @@ the HTML page content is converted to Markdown.
 When [readability-cli](https://gitlab.com/gardenappl/readability-cli)
 is installed, markup is cleaned up to focus on content. When
 [Chromium](https://www.chromium.org) or
-[Chrome](https://www.google.com/chrome/) is installed,
-JavaScript-dependent pages are rendered and the resulting markup is
-saved.
+[Chrome](https://www.google.com/chrome/) is installed on the system,
+`nb` automatically renders JavaScript-dependent pages
+and saves the resulting markup.
 
 Many shells automatically escape special characters in URLs. If a
 URL contains characters that are preventing it from being saved in full,
@@ -4875,6 +4948,8 @@ that could inform a strategy for handling any such cases automatically.
   </sup>
 </p>
 
+#### Importing
+
 Files of any type can be imported into a notebook using
 [`nb import`](#import) (shortcut: [`nb i`](#import)).
 [`nb edit`](#edit) and [`nb open`](#open) open files in
@@ -4932,6 +5007,14 @@ home
 [2] 🔉 example-audio.mp3
 [1] 📂 Example Folder
 ```
+
+#### Importing Bookmarks
+
+Bookmarks exported from Chrome, Firefox, and Edge can be imported with
+[`nb import bookmarks`](#import). A new `nb` bookmark file is created for
+each bookmark.
+
+#### Exporting
 
 Notes, bookmarks, and other files can be exported using [`nb export`](#export).
 If [Pandoc](https://pandoc.org/) is installed,
@@ -5685,9 +5768,9 @@ timestamp is used for sorting.
 
 `nb` also uses plain text files to store ids and state information in
 git, including
-[`.index` files](https://github.com/xwmx/nb#index-files),
-[`.pindex` files](https://github.com/xwmx/nb#pindex-files),
-and [`.archived` files](https://github.com/xwmx/nb#archived-notebooks).
+[`.index` files](#index-files),
+[`.pindex` files](#pindex-files),
+and [`.archived` files](#archived-notebooks).
 
 #### Front Matter
 
@@ -5944,8 +6027,8 @@ Usage:
   nb add [<notebook>:][<folder-path>/][<filename>] [<content>]
          [-b | --browse] [-c <content> | --content <content>] [--edit]
          [-e | --encrypt] [-f <filename> | --filename <filename>]
-         [--folder <folder-path>] [--tags <tag1>,<tag2>...]
-         [-t <title> | --title <title>] [--type <type>]
+         [--folder <folder-path>] [--no-template] [--tags <tag1>,<tag2>...]
+         [--template <template>] [-t <title> | --title <title>] [--type <type>]
   nb add bookmark [<bookmark-options>...]
   nb add folder [<name>]
   nb add todo [<todo-options>...]
@@ -5992,8 +6075,8 @@ Usage:
   nb help [<subcommand>] [-p | --print]
   nb help [-c | --colors] | [-r | --readme] | [-s | --short] [-p | --print]
   nb history [<notebook>:][<folder-path>/][<id> | <filename> | <title>]
-  nb import [copy | download | move] (<path>... | <url>) [--convert]
-            [<notebook>:][<folder-path>/][<filename>]
+  nb import [bookmarks | copy | download | move] (<path>... | <url>)
+            [--convert] [<notebook>:][<folder-path>/][<filename>]
   nb import notebook <path> [<name>]
   nb init [<remote-url> [<branch>]] [--author] [--email <email>]
           [--name <name>]
@@ -6068,9 +6151,10 @@ Usage:
                [<task-number>]
   nb todo undo ([<notebook>:][<folder-path>/][<id> | <filename> | <description>])
                [<task-number>]
-  nb todos [<notebook>:][<folder-path>/] [open | closed] [--tags <tag1>,<tag2>...]
+  nb todos [<notebook>:][<folder-path>/] [open | closed] [--pager]
+               [--tags <tag1>,<tag2>...]
   nb todos tasks ([<notebook>:][<folder-path>/][<id> | <filename> | <description>])
-                 [open | closed]
+                 [open | closed] [--pager]
   nb unarchive [<notebook>]
   nb undo ([<notebook>:][<folder-path>/][<id> | <filename> | <title>])
           [<task-number>]
@@ -6333,8 +6417,8 @@ Usage:
   nb add [<notebook>:][<folder-path>/][<filename>] [<content>]
          [-b | --browse] [-c <content> | --content <content>] [--edit]
          [-e | --encrypt] [-f <filename> | --filename <filename>]
-         [--folder <folder-path>] [--tags <tag1>,<tag2>...]
-         [-t <title> | --title <title>] [--type <type>]
+         [--folder <folder-path>] [--no-template] [--tags <tag1>,<tag2>...]
+         [--template <template>] [-t <title> | --title <title>] [--type <type>]
   nb add bookmark [<bookmark-options>...]
   nb add folder [<name>]
   nb add todo [<todo-options>...]
@@ -6347,7 +6431,9 @@ Options:
   -e, --encrypt               Encrypt the note with a password.
   -f, --filename <filename>   The filename for the new note.
   --folder <folder-path>      Add within the folder located at <folder-path>.
+  --no-template               Skip the template when one is assigned.
   --tags <tag1>,<tag2>...     A comma-separated list of tags.
+  --template <template>       A string template or path to a template file.
   -t, --title <title>         The title for a new note. If `--title` is
                               present, the filename is derived from the
                               title, unless `--filename` is specified.
@@ -7127,19 +7213,24 @@ Examples:
 
 ```text
 Usage:
-  nb import [copy | download | move] (<path>... | <url>) [--convert]
-            [<notebook>:][<folder-path>/][<filename>]
+  nb import [bookmarks | copy | download | move] (<path>... | <url>)
+            [--convert] [<notebook>:][<folder-path>/][<filename>]
   nb import notebook <path> [<name>]
 
 Options:
   --convert  Convert HTML content to Markdown.
 
 Subcommands:
-  (default) Copy or download the file(s) at <path> or <url>.
-  copy      Copy the file(s) at <path> into the current notebook.
-  download  Download the file at <url> into the current notebook.
-  move      Move the file(s) at <path> into the current notebook.
-  notebook  Import the local notebook at <path> to make it global.
+  (default)  Copy or download the file(s) at <path> or <url>.
+  bookmarks  Import bookmarks from a Chrome, Firefox, or Edge export file.
+  copy       Copy the file(s) at <path> into the current notebook.
+  download   Download the file at <url> into the current notebook.
+  move       Move the file(s) at <path> into the current notebook.
+  notebook   Import the local notebook at <path> to make it global.
+
+Description:
+  Copy, move, or download files into `nb`, import bookmarks, or import
+  a local notebook to make it global.
 
 Description:
   Copy, move, or download files into the current notebook or import
@@ -7976,7 +8067,7 @@ Alias:
      ---------
      By default, operations that trigger a git commit like `add`, `edit`,
      and `delete` will sync notebook changes to the remote repository, if
-     one is set. To disable this behavior, set this to "0".
+     the notebook's remote is set. To disable this behavior, set this to "0".
 
      • Default Value: 1
 ```
@@ -8496,7 +8587,10 @@ Examples:
 ```text
 Usage:
   nb tasks ([<notebook>:][<folder-path>/][<id> | <filename> | <description>])
-           [open | closed]
+           [open | closed] [--pager]
+
+Options:
+  --pager  Display output in the pager.
 
 Description:
   List tasks in todos, notebooks, folders, and other items.
@@ -8542,13 +8636,15 @@ Usage:
                [<task-number>]
   nb todo undo ([<notebook>:][<folder-path>/][<id> | <filename> | <description>])
                [<task-number>]
-  nb todos [<notebook>:][<folder-path>/] [open | closed] [--tags <tag1>,<tag2>...]
+  nb todos [<notebook>:][<folder-path>/] [open | closed] [--pager]
+               [--tags <tag1>,<tag2>...]
   nb todos tasks ([<notebook>:][<folder-path>/][<id> | <filename> | <description>])
-                 [open | closed]
+                 [open | closed] [--pager]
 
 Options:
   --description <description>         Description for the todo.
   --due <date>                        Due date and / or time for the todo.
+  --pager                             Display output in the pager.
   -r, --related (<url> | <selector>)  Related URL or selector.
   --tags <tag1>,<tag2>...             Comma-separated list of tags.
   --task <title>                      Task to add to the tasklist.
@@ -9075,6 +9171,8 @@ Shortcut Alias:
     <a href="#nb_ace_keyboard"><code>$NB_ACE_KEYBOARD</code></a>&nbsp;·
     <a href="#nb_audio_tool"><code>$NB_AUDIO_TOOL</code></a>&nbsp;·
     <a href="#nb_auto_sync"><code>$NB_AUTO_SYNC</code></a>&nbsp;·
+    <a href="#nb_bookmark_content_cleanup_tool"><code>$NB_BOOKMARK_CONTENT_CLEANUP_TOOL</code></a>&nbsp;·
+    <a href="#nb_bookmark_content_conversion_tool"><code>$NB_BOOKMARK_CONTENT_CONVERSION_TOOL</code></a>&nbsp;·
     <a href="#nb_browse_markdown_reader"><code>$NB_BROWSE_MARKDOWN_READER</code></a>&nbsp;·
     <a href="#nb_browse_server_tool"><code>$NB_BROWSE_SERVER_TOOL</code></a>&nbsp;·
     <a href="#nb_browse_support_links"><code>$NB_BROWSE_SUPPORT_LINKS</code></a>&nbsp;·
@@ -9088,6 +9186,7 @@ Shortcut Alias:
     <a href="#nb_custom_javascript_url"><code>$NB_CUSTOM_JAVASCRIPT_URL</code></a>&nbsp;·
     <a href="#nb_data_tool"><code>$NB_DATA_TOOL</code></a>&nbsp;·
     <a href="#nb_default_extension"><code>$NB_DEFAULT_EXTENSION</code></a>&nbsp;·
+    <a href="#nb_default_template"><code>$NB_DEFAULT_TEMPLATE</code></a>&nbsp;·
     <a href="#nb_dir-1"><code>$NB_DIR</code></a>&nbsp;·
     <a href="#nb_directory_tool"><code>$NB_DIRECTORY_TOOL</code></a>&nbsp;·
     <a href="#nb_editor"><code>$NB_EDITOR</code></a>&nbsp;·
@@ -9261,6 +9360,51 @@ When set to '1', each `_git checkpoint()` call will automativally run
   </sup>
 </p>
 
+##### `$NB_BOOKMARK_CONTENT_CLEANUP_TOOL`
+
+```text
+Default: 'readability'
+
+The tool used to clean up HTML content before conversion to markdown
+when creating bookmarks.
+
+Supported Tools:
+
+- https://www.npmjs.com/package/readability-cli
+- https://github.com/eafer/rdrview
+
+Supported Values: '', 'rdrview', 'readability'
+```
+
+<p>
+  <sup>
+    <a href="#-variables">↑</a>
+  </sup>
+</p>
+
+##### `$NB_BOOKMARK_CONTENT_CONVERSION_TOOL`
+
+```text
+Default: 'pandoc'
+
+The tool used to convert HTML content to markdown when creating
+bookmarks.
+
+Supported Tools:
+
+- https://github.com/JohannesKaufmann/html-to-markdown
+- https://github.com/microsoft/markitdown
+- https://pandoc.org
+
+Supported Values: '', 'html-to-markdown', 'markitdown', 'pandoc'
+```
+
+<p>
+  <sup>
+    <a href="#-variables">↑</a>
+  </sup>
+</p>
+
 ##### `$NB_BROWSE_MARKDOWN_READER`
 
 ```text
@@ -9383,7 +9527,7 @@ The color theme.
   </sup>
 </p>
 
-##### `NB_CUSTOM_CSS`
+##### `$NB_CUSTOM_CSS`
 
 ```text
 Default: ''
@@ -9398,7 +9542,7 @@ rendered by `nb browse`.
   </sup>
 </p>
 
-##### `NB_CUSTOM_CSS_URL`
+##### `$NB_CUSTOM_CSS_URL`
 
 ```text
 Default: ''
@@ -9413,7 +9557,7 @@ element on pages rendered by `nb browse`.
   </sup>
 </p>
 
-##### `NB_CUSTOM_JAVASCRIPT`
+##### `$NB_CUSTOM_JAVASCRIPT`
 
 ```text
 Default: ''
@@ -9428,7 +9572,7 @@ on pages rendered by `nb browse`.
   </sup>
 </p>
 
-##### `NB_CUSTOM_JAVASCRIPT_URL`
+##### `$NB_CUSTOM_JAVASCRIPT_URL`
 
 ```text
 Default: ''
@@ -9463,6 +9607,22 @@ Example Values: 'visidata', 'sc-im'
 Default: 'md'
 
 Example Values: 'md' 'org'
+```
+
+<p>
+  <sup>
+    <a href="#-variables">↑</a>
+  </sup>
+</p>
+
+##### `$NB_DEFAULT_TEMPLATE`
+
+```text
+Default: ''
+
+A string template or a path to a template file.
+
+Example Values: '/path/to/template/file' '# {{title}} {{content}}'
 ```
 
 <p>

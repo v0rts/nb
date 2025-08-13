@@ -82,7 +82,7 @@ IFS=$'\n\t'
 # $_VERSION
 #
 # The most recent program version.
-_VERSION="7.17.0"
+_VERSION="7.20.1"
 
 # $_ME
 #
@@ -604,6 +604,15 @@ export NB_DATA_TOOL="${NB_DATA_TOOL:-}"
 #
 # Example Values: 'md' 'org'
 export NB_DEFAULT_EXTENSION="${NB_DEFAULT_EXTENSION:-md}"
+
+# $NB_DEFAULT_TEMPLATE
+#
+# Default: ''
+#
+# A string template or a path to a template file.
+#
+# Example Values: '/path/to/template/file' '# {{title}} {{content}}'
+export NB_DEFAULT_TEMPLATE="${NB_DEFAULT_TEMPLATE:-}"
 
 # $NB_DIRECTORY_TOOL
 #
@@ -1559,6 +1568,40 @@ _alias_subcommand() {
   shopt -s extglob
 }
 
+# _bat()
+#
+# Usage:
+#   _bat [--command-exists] [<bat options>]
+#
+# Description:
+#   Wrapper for `bat`, aka `batcat` on debian.
+#
+# Exit / Error / Return Status (--command-exists):
+#   0 (success, true)  If a `bat` or `batcat` exacutable is found on the system.
+#   1 (error,  false)  if not.
+_BAT_COMMAND=
+_bat() {
+  if _command_exists "batcat"
+  then
+    _BAT_COMMAND="batcat"
+  elif _command_exists "bat"
+  then
+    _BAT_COMMAND="bat"
+  fi
+
+  if [[ "${1:-}" == "--command-exists"  ]]
+  then
+    if [[ -n "${_BAT_COMMAND:-}"        ]]
+    then
+      return 0
+    else
+      return 1
+    fi
+  fi
+
+  "${_BAT_COMMAND}" "${@}"
+}
+
 # _file_is_archive()
 #
 # Usage:
@@ -2425,7 +2468,7 @@ _highlight_syntax_if_available() {
     return 0
   fi
 
-  if hash "bat" 2>/dev/null
+  if _bat --command-exists
   then
     local _arguments=()
 
@@ -2436,7 +2479,7 @@ _highlight_syntax_if_available() {
     then
       _arguments+=("--language" "${_extension}")
 
-      if ! printf "" | bat  --color     always          \
+      if ! printf "" | _bat  --color     always          \
                             --language  "${_extension}" \
                             --paging    never           \
                             --plain                     \
@@ -2448,7 +2491,7 @@ _highlight_syntax_if_available() {
       fi
     fi
 
-    bat "${_arguments[@]}"  \
+    _bat "${_arguments[@]}"  \
       --color   always      \
       --paging  never       \
       --plain               \
@@ -2764,15 +2807,15 @@ _open_in_gui_app() {
         "${_gui_browser_command[@]:-}" "${_target:-}" 2>/dev/null &
       fi
     fi
+  elif _command_exists "wslview"
+  then
+    wslview "${_target}"
   elif _command_exists "xdg-open"
   then
     xdg-open "${_target}"
   elif _command_exists "open"
   then
     open "${_target}"
-  elif _command_exists "wslview"
-  then
-    wslview "${_target}"
   elif [[ "${OSTYPE}" =~ cygwin|msys|win32    ]]
   then # https://stackoverflow.com/q/3739327
     rundll32 url.dll,FileProtocolHandler "${_target}"
@@ -2806,9 +2849,9 @@ _pager() {
   elif _command_exists "less"
   then
     less "${_less_options[@]:-}"
-  elif _command_exists "bat"
+  elif _bat --command-exists
   then
-    bat --style numbers,grid
+    _bat --style numbers,grid
   else
     cat
   fi
@@ -4233,7 +4276,7 @@ _help() {
 
   if ((_readme))
   then
-    _download_from                          \
+    _download_from --no-chrome              \
       "${_REPO_RAW_URL}/README.md"          \
         | if _command_exists "pandoc"       &&
              _web_browser --check
@@ -4355,8 +4398,8 @@ $(_color_primary "Usage"):
   ${_ME} add [<notebook>:][<folder-path>/][<filename>] [<content>]
          [-b | --browse] [-c <content> | --content <content>] [--edit]
          [-e | --encrypt] [-f <filename> | --filename <filename>]
-         [--folder <folder-path>] [--tags <tag1>,<tag2>...]
-         [-t <title> | --title <title>] [--type <type>]
+         [--folder <folder-path>] [--no-template] [--tags <tag1>,<tag2>...]
+         [--template <template>] [-t <title> | --title <title>] [--type <type>]
   ${_ME} add bookmark [<bookmark-options>...]
   ${_ME} add folder [<name>]
   ${_ME} add todo [<todo-options>...]
@@ -4403,8 +4446,8 @@ $(_color_primary "Usage"):
   ${_ME} help [<subcommand>] [-p | --print]
   ${_ME} help [-c | --colors] | [-r | --readme] | [-s | --short] [-p | --print]
   ${_ME} history [<notebook>:][<folder-path>/][<id> | <filename> | <title>]
-  ${_ME} import [copy | download | move] (<path>... | <url>) [--convert]
-            [<notebook>:][<folder-path>/][<filename>]
+  ${_ME} import [bookmarks | copy | download | move] (<path>... | <url>)
+            [--convert] [<notebook>:][<folder-path>/][<filename>]
   ${_ME} import notebook <path> [<name>]
   ${_ME} init [<remote-url> [<branch>]] [--author] [--email <email>]
           [--name <name>]
@@ -4479,9 +4522,10 @@ $(_color_primary "Usage"):
                [<task-number>]
   ${_ME} todo undo ([<notebook>:][<folder-path>/][<id> | <filename> | <description>])
                [<task-number>]
-  ${_ME} todos [<notebook>:][<folder-path>/] [open | closed] [--tags <tag1>,<tag2>...]
+  ${_ME} todos [<notebook>:][<folder-path>/] [open | closed] [--pager]
+               [--tags <tag1>,<tag2>...]
   ${_ME} todos tasks ([<notebook>:][<folder-path>/][<id> | <filename> | <description>])
-                 [open | closed]
+                 [open | closed] [--pager]
   ${_ME} unarchive [<notebook>]
   ${_ME} undo ([<notebook>:][<folder-path>/][<id> | <filename> | <title>])
           [<task-number>]
@@ -10155,16 +10199,38 @@ _decrypt_file() {
 # _download_from()
 #
 # Usage:
-#   _download_from <url> [<outfile>]
+#   _download_from <url> [<outfile>] [--no-chrome]
 #
 # Description:
 #   Download the file at <url> and print to standard output or <outfile>, if
 #   present.
 _download_from() {
-  local _download_command=
+  local _download_command="${NB_DOWNLOAD_TOOL:-}"
   local _downloaded=0
+  local _no_chrome=0
+  local _target_path=
   local _timeout=15
-  local _url="${1:-}"
+  local _url=
+
+  while ((${#}))
+  do
+    case "${1:-}" in
+      --no*chrome|--skip*chrome)
+        _no_chrome=1
+        ;;
+      *)
+        if [[   -z "${_url:-}"          ]]
+        then
+          _url="${1:-}"
+        elif [[ -z "${_target_path:-}"  ]]
+        then
+          _target_path="${1:-}"
+        fi
+        ;;
+    esac
+
+    shift
+  done
 
   if [[ -z "${_url}" ]] ||
      [[ !  "${_url}" =~ (^https\:|^http\:|^file\:|^ftp\:|^sftp\:) ]]
@@ -10172,12 +10238,12 @@ _download_from() {
     return 1
   fi
 
-  local _target_path="${2:-}"
-
-  if  ((${NB_BROWSER_DOWNLOAD_ENABLED:-1}))     &&
+  if  ! ((_no_chrome))                          &&
+      [[ -z "${_download_command:-}"        ]]  &&
       {
-        [[ "${_url}"    =~ .html$         ]]    ||
-        [[ ! "${_url}"  =~ .[a-zA-Z0-9]$  ]]
+        [[ "${_url}"    =~ \.html$          ]]  ||
+        [[ "${_url}"    =~ \.php$           ]]  ||
+        [[ ! "${_url}"  =~ \.[a-zA-Z0-9]+$  ]]
       }                                         &&
       [[ ! "${_url}" =~ ^https://www.reddit.com ]]
   then
@@ -10197,6 +10263,11 @@ _download_from() {
     then
       _download_command="/Applications/Chromium.app/Contents/MacOS/Chromium"
     fi
+  fi
+
+  if ((_no_chrome)) && [[ "${_download_command:-}" =~ hrome|hromium ]]
+  then
+    _download_command=
   fi
 
   if [[ -z "${_download_command:-}" ]]
@@ -12543,8 +12614,8 @@ $(_color_primary "Usage"):
   ${_ME} add [<notebook>:][<folder-path>/][<filename>] [<content>]
          [-b | --browse] [-c <content> | --content <content>] [--edit]
          [-e | --encrypt] [-f <filename> | --filename <filename>]
-         [--folder <folder-path>] [--tags <tag1>,<tag2>...]
-         [-t <title> | --title <title>] [--type <type>]
+         [--folder <folder-path>] [--no-template] [--tags <tag1>,<tag2>...]
+         [--template <template>] [-t <title> | --title <title>] [--type <type>]
   ${_ME} add bookmark [<bookmark-options>...]
   ${_ME} add folder [<name>]
   ${_ME} add todo [<todo-options>...]
@@ -12557,7 +12628,9 @@ $(_color_primary "Options"):
   -e, --encrypt               Encrypt the note with a password.
   -f, --filename <filename>   The filename for the new note.
   --folder <folder-path>      Add within the folder located at <folder-path>.
+  --no-template               Skip the template when one is assigned.
   --tags <tag1>,<tag2>...     A comma-separated list of tags.
+  --template <template>       A string template or path to a template file.
   -t, --title <title>         The title for a new note. If \`--title\` is
                               present, the filename is derived from the
                               title, unless \`--filename\` is specified.
@@ -12630,12 +12703,14 @@ _add() {
   local _encrypt=0
   local _file_type="${NB_DEFAULT_EXTENSION}"
   local _folder_prompt=0
+  local _no_template=0
   local _option_content=
   local _option_folder_relative_path=
   local _option_relative_path=
   local _password=
   local _skip_standard_input=0
   local _tag_list=
+  local _template=
   local _title=
 
   while ((${#}))
@@ -12696,6 +12771,9 @@ _add() {
       --no*color)
         _COLOR_ENABLED=0
         ;;
+      --no*template|--skip*template)
+        _no_template=1
+        ;;
       --password)
         _password="$(_option_get_value "${1}" "${2:-}")"
 
@@ -12708,6 +12786,14 @@ _add() {
         [[ -n "${_tag_list:-}" ]] && _tag_list+=" "
         _tag_list+="$(_option_get_tags "${1}" "${2:-}")"
         _defer_arguments+=("${1}" "${2:-}")
+
+        shift
+        ;;
+      --template)
+        _template="${2:-}"
+        _defer_arguments+=("${1}" "${2:-}")
+
+        [[ -z "${2:-}" ]] && _no_template=1
 
         shift
         ;;
@@ -13071,60 +13157,121 @@ _add() {
       fi
     fi
 
-    if [[ -n "${_title}"                  ]]
-    then
-      case "${_target_path:-}" in
-        *.adoc|*.asciidoc)
-          _title_prefix="="
-          ;;
-        *.org)
-          _title_prefix="#+TITLE:"
-          ;;
-        *)
-          _title_prefix="#"
-          ;;
-      esac
+    local _title_prefix=
 
-      printf "%s\\n\\n" "${_title_prefix} ${_title}" >> "${_target_path}"
-    fi
+    case "${_target_path:-}" in
+      *.adoc|*.asciidoc)
+        _title_prefix="="
+        ;;
+      *.org)
+        _title_prefix="#+TITLE:"
+        ;;
+      *)
+        _title_prefix="#"
+        ;;
+    esac
 
-    local _print_spacing=0
+    # prepare content
 
-    if [[ -n "${_tag_list:-}"             ]]
-    then
-      printf "%s\\n" "${_tag_list}" >> "${_target_path}"
-      _print_spacing=1
-    fi
+    local _content_temp_file_path=
+    _content_temp_file_path="$(_temp file --touch)"
 
-    if [[ -n "${_selector_content:-}"     ]]
+    local _piped_content_temp_file_path=
+    _piped_content_temp_file_path="$(_temp file --touch)"
+
+    local _print_content_spacing=0
+
+    if [[ -n "${_selector_content:-}"   ]]
     then # argument content
-      ((_print_spacing)) && printf "\\n"    >> "${_target_path}"
-
-      printf "%s\\n" "${_selector_content}" >> "${_target_path}"
-      _print_spacing=1
+      printf "%s\\n" "${_selector_content}"   >> "${_content_temp_file_path}"
+      _print_content_spacing=1
     fi
 
-    if [[ -n "${_option_content:-}"       ]]
+    if [[ -n "${_option_content:-}"     ]]
     then # argument content
-      ((_print_spacing)) && printf "\\n"  >> "${_target_path}"
+      ((_print_content_spacing)) &&
+        printf "\\n"                          >> "${_content_temp_file_path}"
 
-      printf "%s\\n" "${_option_content}" >> "${_target_path}"
-      _print_spacing=1
+      printf "%s\\n" "${_option_content}"     >> "${_content_temp_file_path}"
+      _print_content_spacing=1
     fi
 
     if _piped_input && ! ((_skip_standard_input))
     then # piped input
-      ((_print_spacing)) &&
-        printf "\\n"  >> "${_target_path}"
+      ((_print_content_spacing)) &&
+        printf "\\n"                          >> "${_content_temp_file_path}"
 
-      cat             >> "${_target_path}"
+      cat                                     >> "${_piped_content_temp_file_path}"
+      cat "${_piped_content_temp_file_path}"  >> "${_content_temp_file_path}"
     fi
 
-    if ((_edit_before_commit))                ||
+    # set default template
+
+    if [[ -z "${_template:-}"           ]]  &&
+       [[ -n "${NB_DEFAULT_TEMPLATE:-}" ]]
+    then
+      _template="${NB_DEFAULT_TEMPLATE}"
+    fi
+
+    # build document
+
+    if [[ -z "${_template:-}"           ]] ||
+       ((_no_template))
+    then # no template
+      if [[ -n "${_title}"              ]]
+      then
+        printf "%s\\n\\n" "${_title_prefix} ${_title}" >> "${_target_path}"
+      fi
+
+      local _print_spacing=0
+
+      if [[ -n "${_tag_list:-}"         ]]
+      then
+        printf "%s\\n" "${_tag_list}"       >> "${_target_path}"
+        _print_spacing=1
+      fi
+
+      if [[ -s "${_content_temp_file_path:-}"          ]]
+      then
+        ((_print_spacing)) && printf "\\n"  >> "${_target_path}"
+
+        cat "${_content_temp_file_path}"    >> "${_target_path}"
+      fi
+    else # template
+      local _template_content=
+      _template_content="$(cat "${_content_temp_file_path}")"
+
+      local _piped_template_content=
+      _piped_template_content="$(cat "${_piped_content_temp_file_path}")"
+
+      {
+        if [[ -f "${_template}" ]] && _file_is_text "${_template}"
+        then
+          cat "${_template}"
+        else
+          printf "%s\\n" "${_template}"
+        fi
+      } | {
+        # shellcheck disable=SC2016
+        LC_ALL=C sed -E                                           \
+          -e 's/\{\{title_prefix}}/${_title_prefix}/g'            \
+          -e 's/\{\{title}}/${_title}/g'                          \
+          -e 's/\{\{tags}}/${_tag_list}/g'                        \
+          -e 's/\{\{content}}/${_template_content}/g'             \
+          -e 's/\{\{selector_content}}/${_selector_content}/g'    \
+          -e 's/\{\{option_content}}/${_option_content}/g'        \
+          -e 's/\{\{piped_content}}/${_piped_template_content}/g' \
+          -e 's/\{\{(date[^}]+)}}/$(\1)/g'
+      } | {
+        eval "echo \"$(cat)\""
+      } >> "${_target_path}"
+    fi
+
+    if ((_edit_before_commit))              ||
        {
-         ! _piped_input                       &&
-         [[ -z "${_selector_content:-}"   ]]  &&
-         [[ -z "${_option_content:-}"     ]]
+         ! _piped_input                     &&
+         [[ -z "${_selector_content:-}" ]]  &&
+         [[ -z "${_option_content:-}"   ]]
        }
     then
       _edit_file "${_target_path}"
@@ -13304,7 +13451,7 @@ $(_color_primary "Shortcut Aliases"):
 HEREDOC
 }
 _bookmark() {
-    # Usage: _bookmark_cleanup_tag_content <string>
+  # Usage: _bookmark_cleanup_tag_content <string>
   _bookmark_cleanup_tag_content() {
     local _character_removal_pattern=
     _character_removal_pattern="$(
@@ -13357,12 +13504,13 @@ _bookmark() {
   local _arguments=()
   local _bookmark_content=
   local _comment=
+  local _content_cleanup_tool="readability"
+  local _content_conversion_tool="pandoc"
   local _edit_before_commit=0
   local _encrypt=0
   local _non_url_arguments=()
   local _password=
   local _quote=
-  local _readability_enabled=1
   local _related_identifiers=()
   local _request_page=1
   local _save_source=0
@@ -13375,6 +13523,16 @@ _bookmark() {
   local _target_filename=
   local _title=
   local _url=
+
+  if [[ -n "${NB_BOOKMARK_CONTENT_CLEANUP_TOOL+x}"    ]]
+  then
+    _content_cleanup_tool="${NB_BOOKMARK_CONTENT_CLEANUP_TOOL}"
+  fi
+
+  if [[ -n "${NB_BOOKMARK_CONTENT_CONVERSION_TOOL+x}" ]]
+  then
+    _content_conversion_tool="${NB_BOOKMARK_CONTENT_CONVERSION_TOOL}"
+  fi
 
   local _previous_arg=
 
@@ -13398,6 +13556,16 @@ _bookmark() {
 
         shift
         ;;
+      --content*cleanup*tool)
+        _content_cleanup_tool="${2:-}"
+
+        shift
+        ;;
+      --content*conversion*tool)
+        _content_conversion_tool="${2:-}"
+
+        shift
+        ;;
       --download|--fetch|--online|--request)
         _request_page=1
         ;;
@@ -13414,9 +13582,6 @@ _bookmark() {
         ;;
       --no*download|--no*fetch|--no*request|--offline)
         _request_page=0
-        ;;
-      --no*readab*|--skip*readab*)
-        _readability_enabled=0
         ;;
       --password)
         _password="$(_option_get_value "${1}" "${2:-}")"
@@ -13522,6 +13687,9 @@ _bookmark() {
 
     shift
   done
+
+  _debug echo "\${_content_cleanup_tool}: '${_content_cleanup_tool:-}'"
+  _debug echo "\${_content_conversion_tool}: '${_content_conversion_tool:-}'"
 
   # `bookmark list`
 
@@ -13666,7 +13834,7 @@ _bookmark() {
         then
           local _wayback_response=
           _wayback_response="$(
-            _download_from                                                \
+            _download_from --no-chrome                                    \
               "https://archive.org/wayback/available?url=${_target_url}"  \
               | grep 'closest'                                            \
               | sed -E "s/.*\"closest\": {([^}]+)}.*/\1/g"                \
@@ -14066,14 +14234,27 @@ _bookmark() {
     then
       local _processed_content=
 
-      if _command_exists "pandoc"   || _command_exists "readable"
+      if  {
+            [[ "${_content_conversion_tool:-}"  == "pandoc"   ]] &&
+            _command_exists "pandoc"
+          } || {
+            [[ "${_content_cleanup_tool:-}"     =~ readab     ]] &&
+            _command_exists "readable"
+          } || {
+            [[ "${_content_cleanup_tool}"       == "rdrview"  ]] ||
+            _contains "${_content_conversion_tool}" \
+                      "html2markdown"               \
+                      "html-to-markdown"            \
+                      "markitdown"
+          }
       then
         _processed_content="$(
           {
             cat "${_temp_file}"
           } | {
-            if _command_exists "readable" && ((_readability_enabled))
-            then
+            if [[ "${_content_cleanup_tool:-}"  =~ readab     ]] &&
+               _command_exists "readable"
+            then # https://www.npmjs.com/package/readability-cli
               readable            \
                 --base "${_url}"  \
                 --quiet           \
@@ -14082,8 +14263,25 @@ _bookmark() {
               cat
             fi
           } | {
-            if _command_exists "pandoc"
-            then
+            if [[ "${_content_cleanup_tool}"    == "rdrview"  ]] &&
+               _command_exists "rdrview"
+            then # https://github.com/eafer/rdrview
+              rdrview -H -u "${_url}"
+            else
+              cat
+            fi
+          } | {
+            if [[ "${_content_conversion_tool:-}"  == "markitdown"  ]] &&
+               _command_exists "markitdown"
+            then # https://github.com/microsoft/markitdown
+              markitdown
+            else
+              cat
+            fi
+          } | {
+            if [[ "${_content_conversion_tool:-}"  == "pandoc"      ]]
+               _command_exists "pandoc"
+            then # https://pandoc.org
               {
                 _pandoc                                 \
                   --standard-input                      \
@@ -14095,6 +14293,16 @@ _bookmark() {
                 # strip empty list items
                 LC_ALL=C sed -E -e 's/^-[[:space:]]*$//g'
               }
+            else
+              cat
+            fi
+          } | {
+            if _contains  "${_content_conversion_tool}" \
+                          "html2markdown"               \
+                          "html-to-markdown"            &&
+               _command_exists "html2markdown"
+            then # https://github.com/JohannesKaufmann/html-to-markdown
+              html2markdown
             else
               cat
             fi
@@ -14127,6 +14335,7 @@ _bookmark() {
       "${_relative_path}"
       --content "${_bookmark_content}"
       --skip-standard-input
+      --no-template
     )
 
     ((_encrypt))                &&  _add_options+=("--encrypt")
@@ -14347,7 +14556,7 @@ _completions() {
           _completion_source="$(_temp file)"
           local _completion_url="${_REPO_RAW_URL}/etc/${_ME}-completion.${__shell}"
 
-          if ! _download_from "${_completion_url}" "${_completion_source}"
+          if ! _download_from "${_completion_url}" "${_completion_source}" --no-chrome
           then
             _exit_1 printf "Unable to download completion script from %s\\n" \
               "${_completion_source}"
@@ -15544,22 +15753,23 @@ _history() {
 _describe_import() {
   cat <<HEREDOC
 $(_color_primary "Usage"):
-  ${_ME} import [copy | download | move] (<path>... | <url>) [--convert]
-            [<notebook>:][<folder-path>/][<filename>]
+  ${_ME} import [bookmarks | copy | download | move] (<path>... | <url>)
+            [--convert] [<notebook>:][<folder-path>/][<filename>]
   ${_ME} import notebook <path> [<name>]
 
 $(_color_primary "Options"):
   --convert  Convert HTML content to Markdown.
 
 $(_color_primary "Subcommands"):
-  (default) Copy or download the file(s) at <path> or <url>.
-  copy      Copy the file(s) at <path> into the current notebook.
-  download  Download the file at <url> into the current notebook.
-  move      Move the file(s) at <path> into the current notebook.
-  notebook  Import the local notebook at <path> to make it global.
+  (default)  Copy or download the file(s) at <path> or <url>.
+  bookmarks  Import bookmarks from a Chrome, Firefox, or Edge export file.
+  copy       Copy the file(s) at <path> into the current notebook.
+  download   Download the file at <url> into the current notebook.
+  move       Move the file(s) at <path> into the current notebook.
+  notebook   Import the local notebook at <path> to make it global.
 
 $(_color_primary "Description"):
-  Copy, move, or download files into the current notebook or import
+  Copy, move, or download files into \`nb\`, import bookmarks, or import
   a local notebook to make it global.
 
 $(_color_primary "Read More"):
@@ -19217,6 +19427,7 @@ Can't show archives. Export archive and expand to edit.\\n"
              _command_exists "${_markdown_tool:-}"              &&
              _contains "${_markdown_tool:-}"                    \
                "bat"                                            \
+               "batcat"                                         \
                "glow"                                           \
                "lowdown"                                        \
                "mdcat"                                          \
@@ -19224,8 +19435,8 @@ Can't show archives. Export archive and expand to edit.\\n"
                "mdv"
           then
             case "${_markdown_tool:-}" in
-              bat)
-                bat --language "${_target_extension:-md}"
+              bat|batcat)
+                _bat --language "${_target_extension:-md}"
                 ;;
               glow)
                 glow --tui
@@ -19622,9 +19833,10 @@ _browse() {
 
       local _new_info_line=
       _new_info_line="$(
-        printf "%b\\n" "${_prepared_encoded_content:-}" \
-          | tr -d $'\r'                                 \
-          | _add "${_add_options[@]:-}"
+        _add "${_add_options[@]:-}" --content "$(
+          printf "%b\\n" "${_prepared_encoded_content:-}" \
+            | tr -d $'\r'
+        )" --skip-standard-input
       )"
 
       local _new_selector="${_new_info_line#*[}"
@@ -22457,9 +22669,9 @@ HEREDOC
       _printable_response="$(
         if ((_print_headers))
         then
-          curl -s -I      "${_request_url//' '/%20}"  || :
+          curl -s -I      "${_request_url//' '/%20}"              || :
         else
-          _download_from  "${_request_url//' '/%20}"  || :
+          _download_from  "${_request_url//' '/%20}" --no-chrome  || :
         fi
       )"
 
@@ -22521,7 +22733,7 @@ HEREDOC
 
   # make a final request to clear any listening process
 
-  (sleep 0.5 && _download_from "${_request_url_base}" &>/dev/null) &
+  (sleep 0.5 && _download_from "${_request_url_base}" --no-chrome &>/dev/null) &
 
   exit 0
 }
@@ -22654,7 +22866,7 @@ _copy() {
     # Print the source contents and pipe to `_add`:
     _show "${_source_notebook_path}/${_source_relative_path}"     \
       --no-color --print                                          \
-      | _add "${_target_notebook_path}/${_target_relative_path}"
+      | _add "${_target_notebook_path}/${_target_relative_path}" --no-template
   else
     local _copy_arguments=(
       "${_source_notebook_path}/${_source_relative_path}"
@@ -23123,7 +23335,7 @@ _plugins() {
           )"
         fi
 
-        if _download_from "${_url}" "${NB_DIR}/.plugins/${_basename}"
+        if _download_from "${_url}" "${NB_DIR}/.plugins/${_basename}" --no-chrome
         then
           printf "Plugin installed:\\n%s\\n"  \
             "$(_color_primary "${NB_DIR}/.plugins/${_basename}")"
@@ -24663,7 +24875,7 @@ HEREDOC
       fi
     elif [[ "${1:-}" == 'NB_SYNTAX_THEME'     ]]
     then
-      if ! hash bat 2>/dev/null
+      if ! _bat --command-exists
       then
         printf "bat required: https://github.com/sharkdp/bat\\n"
       elif [[ -z "${2:-}"                     ]]
@@ -24671,7 +24883,7 @@ HEREDOC
         return 1
       else
         local _theme_list=
-        _theme_list=($(bat --list-themes --color never))
+        _theme_list=($(_bat --list-themes --color never))
 
         local __theme=
         for   __theme in "${_theme_list[@]}"
@@ -24707,7 +24919,7 @@ HEREDOC
     $(_color_secondary " ---------")
      By default, operations that trigger a git commit like \`add\`, \`edit\`,
      and \`delete\` will sync notebook changes to the remote repository, if
-     one is set. To disable this behavior, set this to \"0\".
+     the notebook's remote is set. To disable this behavior, set this to \"0\".
 
      • Default Value: $(_color_primary "1")")
 
@@ -24847,10 +25059,10 @@ $(
     $(_color_secondary " ------------")
      The syntax highlighting theme. View examples with:
 
-         $(_color_primary 'bat --list-themes')
+         $(_color_primary "${_BAT_COMMAND} --list-themes")
 
 $(
-  if ! hash "bat" 2>/dev/null
+  if ! _bat --command-exists
   then
     printf "     Install \`bat\` to enable themes: https://github.com/sharkdp/bat\\n"
   else
@@ -24858,7 +25070,7 @@ $(
     printf "\\n"
 
     local __theme=
-    for   __theme in $(bat --list-themes --color never)
+    for   __theme in $(_bat --list-themes --color never)
     do
       printf "         %s\\n" "$(_color_primary "${__theme}")"
     done
@@ -25413,7 +25625,10 @@ _describe_tasks() {
   cat <<HEREDOC
 $(_color_primary "Usage"):
   ${_ME} tasks ([<notebook>:][<folder-path>/][<id> | <filename> | <description>])
-           [open | closed]
+           [open | closed] [--pager]
+
+$(_color_primary "Options"):
+  --pager  Display output in the pager.
 
 $(_color_primary "Description"):
   List tasks in todos, notebooks, folders, and other items.
@@ -25459,13 +25674,15 @@ $(_color_primary "Usage"):
                [<task-number>]
   ${_ME} todo undo ([<notebook>:][<folder-path>/][<id> | <filename> | <description>])
                [<task-number>]
-  ${_ME} todos [<notebook>:][<folder-path>/] [open | closed] [--tags <tag1>,<tag2>...]
+  ${_ME} todos [<notebook>:][<folder-path>/] [open | closed] [--pager]
+               [--tags <tag1>,<tag2>...]
   ${_ME} todos tasks ([<notebook>:][<folder-path>/][<id> | <filename> | <description>])
-                 [open | closed]
+                 [open | closed] [--pager]
 
 $(_color_primary "Options"):
   --description <description>         Description for the todo.
   --due <date>                        Due date and / or time for the todo.
+  --pager                             Display output in the pager.
   -r, --related (<url> | <selector>)  Related URL or selector.
   --tags <tag1>,<tag2>...             Comma-separated list of tags.
   --task <title>                      Task to add to the tasklist.
@@ -25605,6 +25822,7 @@ _todo() {
   local _tags=()
   local _task_list_options=()
   local _tasks=()
+  local _use_pager=0
 
   while ((${#}))
   do
@@ -25618,6 +25836,9 @@ _todo() {
         _due_datetime="$(_option_get_value "${1:-}" "${2:-}")"
 
         shift
+        ;;
+      --pager|--less)
+        _use_pager=1
         ;;
       --recursive|--tree)
         _task_list_options+=("--recursive")
@@ -25830,6 +26051,7 @@ _todo() {
       _add                                  \
         --content "${_todo_content:-}"      \
         --type    "todo.md"                 \
+        --no-template                       \
         "${_arguments[@]:-}"
       ;;
     do|undo)
@@ -26071,7 +26293,6 @@ _todo() {
             "${_task_list_options[@]:-}"  \
             2>/dev/null || printf ""
         fi
-
       } | {
         local _first=1
         local _in_task_list_item=0
@@ -26283,7 +26504,12 @@ _todo() {
 
           return 1
         fi
-      }
+      } | if ((_use_pager))
+      then
+        _pager
+      else
+        cat
+      fi
       ;;
   esac
 }
@@ -26451,7 +26677,7 @@ HEREDOC
     local _temp_file=
     _temp_file="$(_temp file)"
 
-    if ! _download_from "${_nb_url}" "${_temp_file}"
+    if ! _download_from "${_nb_url}" "${_temp_file}" --no-chrome
     then
       _exit_1 printf "Unable to download update.\\n"
     fi
