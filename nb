@@ -82,7 +82,7 @@ IFS=$'\n\t'
 # $_VERSION
 #
 # The most recent program version.
-_VERSION="7.20.1"
+_VERSION="7.21.3"
 
 # $_ME
 #
@@ -206,7 +206,7 @@ _resolve_symlink() {
 _sed_i() {
   local _usage=
 
-  if _usage="$(sed --help 2>&1)"
+  if _usage="$(sed --help 2>&1 || false)"
   then # GNU
     sed -i      "${@}"
   else # BSD
@@ -584,6 +584,14 @@ export NB_AUDIO_TOOL="${NB_AUDIO_TOOL:-}"
 # `$_ME sync`. To disable this behavior, set the value to '0'.
 export NB_AUTO_SYNC="${NB_AUTO_SYNC:-1}"
 
+# $NB_AUTO_SYNC_SECONDS
+#
+# Default: '60'
+#
+# The minimum number of seconds between automatic Git sync operations when
+# `$NB_AUTO_SYNC` is enabled.
+export NB_AUTO_SYNC_SECONDS="${NB_AUTO_SYNC_SECONDS:-60}"
+
 # $NB_BROWSER
 #
 # Default: value of $BROWSER
@@ -686,19 +694,30 @@ export _GIT_ENABLED="${_GIT_ENABLED:-1}"
 #
 # Default: '15'
 #
-# Set to a positive number to limit the output of `nb` and `nls` to that value.
+# Set to a positive number to limit the output of `nb` and `nb ls` to that value.
 # Set to "auto" to automatically limit output to the current terminal height.
-# Subtract an auto limit offset for multiline prompts with `auto-<number>`.
+# Set a maximum auto limit with `auto^<max>`, e.g., `auto^15`.
+# Subtract an auto limit offset for multiline prompts with `auto-<offset>`.
+# Add an auto limit offet with `auto+<offset>`.
+# Combine both modifiers with `auto-<offset>^<max>` or `auto+<offset>^<max>`.
 #
 # Supported Values:
-#   - <number>
-#   - auto-<number>
-#   - auto-<number>
+#   - <max>
+#   - auto
+#   - auto^<max>
+#   - auto-<offset>
+#   - auto+<offset>
+#   - auto-<offset>^<max>
+#   - auto+<offset>^<max>
 #
 # Example Values:
 #   - 15
 #   - auto
+#   - auto^15
 #   - auto-2
+#   - auto+2
+#   - auto-2^15
+#   - auto+2^15
 
 export _AUTO_LIMIT=
 export _AUTO_LIMIT_MAX=
@@ -2665,7 +2684,7 @@ _list_files() {
     if ((_reverse))
     then
       # https://stackoverflow.com/a/744093
-      sed '1!G;h;$!d'
+      LC_ALL=C sed '1!G;h;$!d'
     else
       cat
     fi
@@ -3719,7 +3738,12 @@ _git() {
       return 0
     fi
 
-    if _maybe_fetch_timestamp="$(
+    if [[ -s "${_notebook_path}/.git/nb/last_sync_state_checked" ]]
+    then
+      _last_fetch_timestamp="$(
+        cat "${_notebook_path}/.git/nb/last_sync_state_checked" 2>/dev/null
+      )"
+    elif _maybe_fetch_timestamp="$(
          stat -c %Y "${_notebook_path}/.git/FETCH_HEAD" 2>/dev/null
        )"
     then # GNU
@@ -3741,7 +3765,7 @@ _git() {
     local _diff=
     _diff=$((_current_timestamp-_last_fetch_timestamp))
 
-    [[ "${_diff}" -gt 60 ]]
+    [[ "${_diff}" -gt "${NB_AUTO_SYNC_SECONDS:-60}" ]]
   }
 
   # _git_checkpoint()
@@ -3878,7 +3902,28 @@ _git() {
       _notebook_path="$(_notebooks current --path)"
     fi
 
-    git -C "${_notebook_path}" status | grep -q 'diverged'
+    # get the current branch name
+    local _branch=
+    _branch="$(
+      git -C "${_notebook_path}" rev-parse --abbrev-ref HEAD
+    )"
+
+    # get the local branch HEAD SHA
+    local _local_head=
+    _local_head="$(
+      git -C "${_notebook_path}" rev-parse "${_branch}"
+    )"
+
+    # get the remote branch HEAD SHA
+    local _remote_head=
+    _remote_head="$(
+      git -C "${_notebook_path}" ls-remote origin "refs/heads/${_branch}" 2>/dev/null | awk '{print $1}'
+    )"
+
+    mkdir -p "${_notebook_path}/.git/nb"
+    date +%s > "${_notebook_path}/.git/nb/last_sync_state_checked"
+
+    [[ -n "${_remote_head:-}" ]] && [[ "${_local_head}" != "${_remote_head}" ]]
   }
 
   # _git_required()
@@ -4433,7 +4478,8 @@ $(_color_primary "Usage"):
         [<task-number>]
   ${_ME} edit ([<notebook>:][<folder-path>/][<id> | <filename> | <title>])
           [-c <content> | --content <content>] [--edit]
-          [-e <editor> | --editor <editor>] [--overwrite] [--prepend]
+          [-e <editor> | --editor <editor>] [-l | --last] [--overwrite]
+          [--prepend]
   ${_ME} export ([<notebook>:][<folder-path>/][<id> | <filename> | <title>])
             <path> [-f | --force] [<pandoc options>...]
   ${_ME} export notebook <name> [<path>]
@@ -4786,7 +4832,7 @@ _index() {
       if ! grep -q "^${_basename}$" "${_index_path}"
       then
         {
-          printf "%s\\n" "${_basename}" | sed -E "${_IGNORE_PATTERNS[@]:-}"
+          printf "%s\\n" "${_basename}" | LC_ALL=C sed -E "${_IGNORE_PATTERNS[@]:-}"
         } >> "${_index_path}"
       fi
       ;;
@@ -4821,7 +4867,7 @@ _index() {
           return 1
         fi
 
-        sed "${1:-}q;d" "${2:-}"
+        LC_ALL=C sed "${1:-}q;d" "${2:-}"
       }
 
       local _id_number="${2:-}"
@@ -4864,7 +4910,7 @@ _index() {
         _basename="${_basename//\[/\\\[}"
         _basename="${_basename//\]/\\\]}"
 
-        sed -n "/^${_basename:-}$/=" "${2:-}"
+        LC_ALL=C sed -n "/^${_basename:-}$/=" "${2:-}"
       }
 
       local _basename="${2:-}"
@@ -4953,7 +4999,7 @@ _index() {
         {
           ls -t -r "${_current_folder_path:?}"
         } | {
-          sed -E "${_IGNORE_PATTERNS[@]:-}"
+          LC_ALL=C sed -E "${_IGNORE_PATTERNS[@]:-}"
         } > "${_current_folder_path:?}/.index"
 
         _current_folder_path="${_current_folder_path%/*}"
@@ -5002,7 +5048,7 @@ _index() {
           {
             ls -t -r "${_current_folder_path:?}"
           } | {
-            sed -E "${_IGNORE_PATTERNS[@]:-}"
+            LC_ALL=C sed -E "${_IGNORE_PATTERNS[@]:-}"
           } > "${_current_folder_path:?}/.index"
         fi
 
@@ -5014,7 +5060,7 @@ _index() {
           {
             ls -t -r "${_current_folder_path:?}"
           } | {
-            sed -E "${_IGNORE_PATTERNS[@]:-}"
+            LC_ALL=C sed -E "${_IGNORE_PATTERNS[@]:-}"
           }
         ))
 
@@ -5110,7 +5156,7 @@ _index() {
         {
           ls -t -r "${_folder_path}"
         } | {
-          sed -E "${_IGNORE_PATTERNS[@]:-}"
+          LC_ALL=C sed -E "${_IGNORE_PATTERNS[@]:-}"
         }
       ))
 
@@ -5923,7 +5969,7 @@ _list() {
       fi
     fi
   } | {
-    sed -E "${_IGNORE_PATTERNS[@]:-}"
+    LC_ALL=C sed -E "${_IGNORE_PATTERNS[@]:-}"
   } | {
     local _filenames_count=0
     local _matches=0
@@ -6176,13 +6222,13 @@ ${_title_basename_or_path_color/\[$' '\]/${_TPUT_SETAF_8}[ ]${_TPUT_SGR0}}"
 
         local _item_id=
         # use `sed` directly instead of `_index get_id` for performance
-        _item_id="$(sed -n "/^${_escaped_basename:-}$/=" "${_list_path:-}/.index")"
+        _item_id="$(LC_ALL=C sed -n "/^${_escaped_basename:-}$/=" "${_list_path:-}/.index")"
 
         if [[ -z "${_item_id:-}" ]]
         then
           _index reconcile "${_list_path:-}" --ancestors --commit
 
-          _item_id="$(sed -n "/^${_escaped_basename:-}$/=" "${_list_path:-}/.index")"
+          _item_id="$(LC_ALL=C sed -n "/^${_escaped_basename:-}$/=" "${_list_path:-}/.index")"
         fi
 
         local _item_identifier="${_maybe_selector_context:-}${_item_id:-}"
@@ -6850,7 +6896,7 @@ _ls() {
       else # print line the length of the first line.
         _print_line "$(
           # $_output_line_raw content is 2 characters too long. TODO: Review
-          printf "%s" "${_output_line_raw}" | sed 's/..$//'
+          printf "%s" "${_output_line_raw}" | LC_ALL=C sed 's/..$//'
         )" | tr -d '\n'
       fi
 
@@ -7187,7 +7233,7 @@ _ls() {
         local _maybe_notebook_name="${_arguments[0]:-}"
 
         _maybe_notebook_name="$(
-          printf "%s\\n" "${_maybe_notebook_name}" | sed 's/\:$//'
+          printf "%s\\n" "${_maybe_notebook_name}" | LC_ALL=C sed 's/\:$//'
         )"
 
         local _notebook_name=
@@ -8969,7 +9015,7 @@ HEREDOC
            [[ -n "${_local_notebook_path:-}"        ]]
         then
           _notebook_path="${_local_notebook_path%/}"
-        elif [[ -d "${NB_DIR}/${_selector_notebook:-}/.git"    ]] &&
+        elif [[ -e "${NB_DIR}/${_selector_notebook:-}/.git"    ]] &&
              [[ -f "${NB_DIR}/${_selector_notebook:-}/.index"  ]]
         then
           _notebook_path="${NB_DIR}/${_selector_notebook%/}"
@@ -9031,7 +9077,7 @@ HEREDOC
     if [[ "${_escaped_name}" =~ \         ]]
     then
       _escaped_name="$(
-        printf "%s\\n" "${_escaped_name}" | sed -e "s/ /\\\ /g"
+        printf "%s\\n" "${_escaped_name}" | LC_ALL=C sed -e "s/ /\\\ /g"
       )"
     fi
 
@@ -9986,9 +10032,9 @@ _main() {
           _index reconcile
 
           _git checkpoint "${NB_NOTEBOOK_PATH}" --wait
-        elif _git autosyncable "${NB_NOTEBOOK_PATH}"
+        elif _git autosyncable "${NB_NOTEBOOK_PATH}" && _git out_of_sync
         then
-          (_git checkpoint "${NB_NOTEBOOK_PATH}" &>/dev/null) &
+          _git checkpoint "${NB_NOTEBOOK_PATH}" --wait
         fi
       fi
 
@@ -10094,7 +10140,7 @@ _build_related_list() {
       if [[ "${__identifier:-}" =~ \[\[.*\]\] ]]
       then
         __identifier="$(
-          sed -E -e "s/\[\[(.*)\]\]/\1/g" <<< "${__identifier:-}"
+          LC_ALL=C sed -E -e "s/\[\[(.*)\]\]/\1/g" <<< "${__identifier:-}"
         )"
       fi
 
@@ -10568,27 +10614,51 @@ _encrypt_file() {
 # Description:
 #   Print the name of the tool to use to decrypt the file at <path>.
 _get_decryption_tool() {
+  local _decryption_tool=
   local _encrypted_path="${1:-}"
 
-  local _file_command_response=
-  _file_command_response="$(file "${_encrypted_path}" 2>/dev/null || :)"
-
-  local _decryption_tool=
-
-  if [[   "${_file_command_response}" =~ (GPG|PGP)  ]]
+  if _command_exists "file"
   then
-    _decryption_tool="gpg"
-  elif [[ "${_file_command_response}" =~ openssl    ]]
-  then
-    _decryption_tool="openssl"
-  elif [[ "${_file_command_response}" =~ data       ]]
-  then
-    local         __first_line=
-    IFS=  read -r __first_line < "${_encrypted_path}"
+    local _file_command_response=
+    _file_command_response="$(file "${_encrypted_path}" 2>/dev/null || :)"
 
-    if [[ "${__first_line:-}" =~ age-encryption     ]]
+    if [[   "${_file_command_response}" =~ (GPG|PGP)  ]]
     then
+      _decryption_tool="gpg"
+    elif [[ "${_file_command_response}" =~ openssl    ]]
+    then
+      _decryption_tool="openssl"
+    elif [[ "${_file_command_response}" =~ data       ]]
+    then
+      local         __first_line=
+      IFS=  read -r __first_line < "${_encrypted_path}"
+
+      if [[ "${__first_line:-}" =~ age-encryption     ]]
+      then
+        _decryption_tool="age"
+      fi
+    fi
+  else
+    # Read the first line and first 16 bytes (for binary signatures)
+    local _first_line=
+    IFS= read -r _first_line < "${_encrypted_path}"
+
+    local _first_bytes=
+    _first_bytes="$(head -c 16 "${_encrypted_path}" | xxd -p)"
+
+    if [[ "${_first_line}" == age-encryption* ]]
+    then # age
       _decryption_tool="age"
+    elif [[ "${_first_line}" == "-----BEGIN PGP MESSAGE-----" ]] ||
+         [[ "${_first_line}" == "-----BEGIN GPG MESSAGE-----" ]]
+    then # GPG/PGP ASCII armored header
+      _decryption_tool="gpg"
+    elif [[ "${_first_bytes}" =~ ^8c ]] || [[ "${_first_bytes}" =~ ^99 ]]
+    then # GPG binary (magic number: 0x8c/0x99 at start, but can be more complicated)
+      _decryption_tool="gpg"
+    elif head -c 8 "${_encrypted_path}" | grep -q "^Salted__"
+    then # OpenSSL (Salted__ in ASCII at start)
+      _decryption_tool="openssl"
     fi
   fi
 
@@ -10687,7 +10757,7 @@ _get_http_status() {
 #   Get a santized filename derived from an input string, such as a title.
 _get_sanitized_filename() {
   printf "%s" "${1:-}"                          \
-    | sed -E                                    \
+    | LC_ALL=C sed -E                           \
         -e 's/^[[:space:]]+//g'                 \
         -e 's/[[:space:]]+$//g'                 \
         -e 's/\[[[:space:]]*\][[:space:]]*//g'  \
@@ -10842,6 +10912,29 @@ _get_uri() {
     http%3A%2F*|https%3A%2F*) _get_uri_decode "${1:-}"  ;;
     http://*|https://*)       _get_uri_encode "${1:-}"  ;;
   esac
+}
+
+# _normalize_encoding()
+#
+# Usage:
+#   _normalize_encoding <input>
+#
+# Description:
+#   Use python3 or perl to normalize encoding of a string.
+_normalize_encoding() {
+  {
+    printf "%s" "${1:-}"
+  } | {
+    if _command_exists "python3"
+    then
+      python3 -c "import sys,unicodedata; print(unicodedata.normalize('NFC', sys.stdin.read()), end='')"
+    elif _command_exists "perl"
+    then
+      perl -MUnicode::Normalize -CS -ne 'print NFC($_)'
+    else
+      cat
+    fi
+  }
 }
 
 # _option_get_tags()
@@ -11167,9 +11260,11 @@ blockquote {
 }
 
 code {
+  background-color:   ${_color_background_alt_hex};
   font-family: Menlo, Monaco, 'Lucida Console', Consolas, monospace;
   font-size:          85%;
   margin:             0;
+  padding:            0.2em 0.4em;
   white-space:        pre-wrap;
 }
 
@@ -11188,6 +11283,7 @@ pre.sourceCode {
 
 pre code {
   overflow:           visible;
+  padding:            0;
 }
 
 hr  {
@@ -12136,6 +12232,26 @@ _resolve_links() {
     esac
   fi
 
+  # hashtag patterns
+
+  local _hashtag_match_pattern="(^|${_ME}-linkable-${_ME}|[>|\ ])\#([A-Za-z0-9_\-]+)"
+  local _hashtag_replacement_url="\/\/${NB_SERVER_HOST}:${NB_SERVER_PORT}\/${_notebook_name}:"
+
+  case "${_url_params_pattern:-}" in
+    '') _hashtag_replacement_url+="?--query=%23\\2"                         ;;
+    *)  _hashtag_replacement_url+="${_url_params_pattern}\&--query=%23\\2"  ;;
+  esac
+
+  local _hashtag_pattern=
+
+  case "${_input_type:-}" in
+    html) _hashtag_pattern="<a\ href=\"${_hashtag_replacement_url//' '/%20}\">\#\\2<\/a>" ;;
+    org)  _hashtag_pattern="[[${_hashtag_replacement_url//' '/%20}][\#\\2]]"              ;;
+    *)    _hashtag_pattern="\#\\2"                                                        ;;
+  esac
+
+  # temp file
+
   local _input_temp_file_path=
   _input_temp_file_path="$(_temp file ".${_input_type}" --touch)"
 
@@ -12146,33 +12262,11 @@ _resolve_links() {
   } | {
     # link #hashtags to internal search URLs
 
-    if ! ((_for_browsing))
+    if ! ((_for_browsing)) || [[ "${_input_type:-}" == "html" ]]
     then
       cat
     else
-      local _replacement_url="\/\/${NB_SERVER_HOST}:${NB_SERVER_PORT}\/${_notebook_name}:"
-
-      case "${_url_params_pattern:-}" in
-        '') _replacement_url+="?--query=%23\\2"                         ;;
-        *)  _replacement_url+="${_url_params_pattern}\&--query=%23\\2"  ;;
-      esac
-
-      local _pattern=
-
-      case "${_input_type:-}" in
-        html) _pattern="<a\ href=\"${_replacement_url//' '/%20}\">\#\\2<\/a>" ;;
-        org)  _pattern="[[${_replacement_url//' '/%20}][\#\\2]]"              ;;
-        *)    _pattern="\#\\2"                                                ;;
-      esac
-
-      if [[ "${_input_type:-}" == "html" ]] &&
-         grep -q "<\/body>" "${_input_temp_file_path}"
-      then
-        LC_ALL=C sed -E \
-          -e "/<body>/,/<\/body>/ s/(^|[>|\ ])\#([A-Za-z0-9_\-]+)/\1${_pattern}/g"
-      else
-        LC_ALL=C sed -E -e "s/(^|[>|\ ])\#([A-Za-z0-9_\-]+)/\1${_pattern}/g"
-      fi
+      LC_ALL=C sed -E -e "s/${_hashtag_match_pattern}/\1${_hashtag_pattern}/g"
     fi
   } | {
     # resolve and link [[wiki-style links]]
@@ -12197,15 +12291,31 @@ _resolve_links() {
       local _notebookless_pattern="${_host_port_pattern}\/([^:?\"-]+[\?\"])"
       local _notebookless_replacement_pattern="${_host_port_pattern}\/${_notebook_name}:\1"
 
-      local _linkable=1
+      local _linkable_initial=1
+
+      if grep -q "<\/body>" "${_input_temp_file_path}"
+      then
+        _linkable_initial=0
+      fi
 
       {
+        local _linkable="${_linkable_initial}"
+
         local               __line=
         while IFS= read -r  __line
         do
-          if [[ "${__line:-}" =~ (\<nav|\<code)     ]]
+          if ((_linkable))
           then
-            _linkable=0
+            if [[ "${__line:-}" =~ ^[[:space:]]*(<p[[:space:]]*>)?(<pre[[:space:]]*>)?\<(nav|code) ]]
+            then
+              _linkable=0
+            fi
+          elif ! ((_linkable))
+          then
+            if [[ "${__line:-}" =~ ^[[:space:]]*\<body ]]
+            then
+              _linkable=1
+            fi
           fi
 
           if ((_linkable))
@@ -12215,17 +12325,36 @@ _resolve_links() {
             printf "%s\\n" "${__line:-}"
           fi
 
-          if [[ "${__line:-}" =~ (\<\/nav|\<\/code) ]]
+          if ((_linkable))
           then
-            _linkable=1
+            if [[ "${__line:-}" =~ ^[[:space:]]*\</body ]]
+            then
+              _linkable=0
+            fi
+          else
+            if [[ "${__line:-}" =~ \<\/(nav|code)[[:space:]]*\>(</pre[[:space:]]*>)?(</p[[:space:]]*>)?[[:space:]]*$ ]]
+            then
+              _linkable=1
+            fi
           fi
         done
       } | {
+        # Replace [[ with placeholder INSIDE <code>...</code> (including <p><code>)
+        LC_ALL=C sed -E -e 's/(<code[^>]*>[^<]*)\[\[([^<]*<\/code>)/\1__LEFTDBLBRACKET__\2/g' \
+                        -e 's/(<p[[:space:]]*><code[^>]*>[^<]*)\[\[([^<]*<\/code>[[:space:]]*<\/p>)/\1__LEFTDBLBRACKET__\2/g'
+      } | {
+        # Replace # with placeholder INSIDE <code>...</code> (including <p><code>)
+        LC_ALL=C sed -E -e 's/(<code[^>]*>[^<]*)\#([^<]*<\/code>)/\1__HASH_PLACEHOLDER__\2/g' \
+                        -e 's/(<p[[:space:]]*><code[^>]*>[^<]*)\#([^<]*<\/code>[[:space:]]*<\/p>)/\1__HASH_PLACEHOLDER__\2/g'
+      } | {
         # wrap [[wiki-style links]] in HTML links and add missing notebooks
-        sed -E                                                                                    \
+        LC_ALL=C sed -E                                                                                    \
 -e "/^${_ME}-linkable-${_ME}/ s/${_link_match_pattern}/${_replacement_pattern}/g"                 \
 -e "/^${_ME}-linkable-${_ME}/ s/${_labeled_link_match_pattern}/${_labeled_replacement_pattern}/g" \
--e "/^${_ME}-linkable-${_ME}/ s/${_notebookless_pattern}/${_notebookless_replacement_pattern}/g"
+-e "/^${_ME}-linkable-${_ME}/ s/${_notebookless_pattern}/${_notebookless_replacement_pattern}/g"  \
+-e "/^${_ME}-linkable-${_ME}/ s/${_hashtag_match_pattern}/\1${_hashtag_pattern}/g"
+      } | {
+        LC_ALL=C sed -E -e 's/__LEFTDBLBRACKET__/[[/g' -e 's/__HASH_PLACEHOLDER__/#/g'
       } | {
         LC_ALL=C sed -E -e "s/^${_ME}-linkable-${_ME}//g"
       }
@@ -12759,7 +12888,7 @@ _add() {
         ;;
       --folder)
         _option_folder_relative_path="$(
-          _option_get_value "${1}" "${2:-}" | sed -e 's/\/$//'
+          _option_get_value "${1}" "${2:-}" | LC_ALL=C sed -e 's/\/$//'
         )"
         _defer_arguments+=("${1}" "${_option_folder_relative_path:-}")
 
@@ -12991,6 +13120,8 @@ _add() {
       _target_filename="folder"
     fi
   fi
+
+  _target_filename="$(_normalize_encoding "${_target_filename}")"
 
   # Folder
   # ------
@@ -13461,9 +13592,9 @@ _bookmark() {
     # `awk` condenses and trims whitespace
     # `sed` removes select unicode characters
     # `w3m` converts HTML entities
-    printf "%s\\n" "${1:-}"                             \
-      | awk '$1=$1'                                     \
-      | sed -E -e "s/${_character_removal_pattern}//g"  \
+    printf "%s\\n" "${1:-}"                                     \
+      | awk '$1=$1'                                             \
+      | LC_ALL=C sed -E -e "s/${_character_removal_pattern}//g" \
       | if _command_exists "w3m"
         then
            w3m -dump -T text/html -cols 99999
@@ -13732,7 +13863,9 @@ _bookmark() {
         if [[ "${_subcommand}" =~ (^open$|^peek$)   ]]
         then
           local _maybe_notebook="${_selector:-}"
-          _maybe_notebook="$(printf "%s\\n" "${_maybe_notebook}" | sed 's/\:$//')"
+          _maybe_notebook="$(
+            printf "%s\\n" "${_maybe_notebook}" | LC_ALL=C sed 's/\:$//'
+          )"
 
           if [[ -d "${NB_DIR}/${_maybe_notebook}/.git" ]]
           then
@@ -13837,8 +13970,8 @@ _bookmark() {
             _download_from --no-chrome                                    \
               "https://archive.org/wayback/available?url=${_target_url}"  \
               | grep 'closest'                                            \
-              | sed -E "s/.*\"closest\": {([^}]+)}.*/\1/g"                \
-              | sed -E "s/.*\"url\": \"([^\"]+)\".*/\1/g" || printf ""
+              | LC_ALL=C sed -E "s/.*\"closest\": {([^}]+)}.*/\1/g"       \
+              | LC_ALL=C sed -E "s/.*\"url\": \"([^\"]+)\".*/\1/g" || printf ""
           )"
 
           if [[ -n "${_wayback_response:-}" ]]
@@ -13928,7 +14061,7 @@ _bookmark() {
   local _download_url="${_url}"
   _download_url="$(
     printf "%s\\n" "${_download_url}"       \
-      | sed 's/https:\/\/twitter.com/https:\/\/mobile.twitter.com/g'
+      | LC_ALL=C sed 's/https:\/\/twitter.com/https:\/\/mobile.twitter.com/g'
   )"
 
   if [[ "${_selector}" =~ (:|^/)  ]]
@@ -14106,7 +14239,17 @@ _bookmark() {
 
   if _file_is_text "${_temp_file}"
   then
-    if [[ -z "${_title}"    ]]
+    if [[ -z "${_title:-}"  ]] &&
+       [[ "${_url:-}" =~ ^https://www.reddit.com ]]
+    then
+      _title="$(
+        cat "${_temp_file}"                   \
+          | grep '<shreddit-title title="'    \
+          | sed -n 's/.*<shreddit-title title="\([^"]*\)".*/\1/p'
+      )"
+    fi
+
+    if [[ -z "${_title:-}"  ]]
     then
       _title="$(
         cat "${_temp_file}"                   \
@@ -14925,7 +15068,8 @@ _describe_edit() {
 $(_color_primary "Usage"):
   ${_ME} edit ([<notebook>:][<folder-path>/][<id> | <filename> | <title>])
           [-c <content> | --content <content>] [--edit]
-          [-e <editor> | --editor <editor>] [--overwrite] [--prepend]
+          [-e <editor> | --editor <editor>] [-l | --last] [--overwrite]
+          [--prepend]
 
 $(_color_primary "Options"):
   -c, --content <content>  Content to add to the item.
@@ -14933,6 +15077,7 @@ $(_color_primary "Options"):
                            content is piped or passed as an argument.
   -e, --editor <editor>    Edit the note with <editor>, overriding the editor
                            specified in the \`\$EDITOR\` environment variable.
+  -l, --last               Edit the last modified item.
   --overwrite              Overwrite existing content with <content> and
                            standard input.
   --prepend                Prepend <content> and standard input before
@@ -14981,8 +15126,10 @@ _edit() {
   local _content_option_present=0
   local _edit_before_commit=0
   local _edit_type="append"
+  local _edit_last_item=0
   local _local_editor=
   local _password=
+  local _selector=
 
   while ((${#}))
   do
@@ -15017,11 +15164,11 @@ _edit() {
       --append|--overwrite|--prepend)
         _edit_type="${1#--}"
 
-        if [[ -n  "${2:-}"                  ]] &&
-           [[ !   "${2:-}" =~ ^--[A-z0-9]+  ]] &&
+        if [[ -n  "${2:-}"                    ]] &&
+           [[ !   "${2:-}" =~ ^--[A-Za-z0-9]+ ]] &&
            ! _contains "${2:-}" "-c" "-e"
         then
-          if [[ -n "${_content:-}"          ]]
+          if [[ -n "${_content:-}"            ]]
           then
             _content+="${_NEWLINE}"
           fi
@@ -15031,13 +15178,23 @@ _edit() {
           shift
         fi
         ;;
+      -l|--last*)
+        if [[ "${2:-}" =~ ^[0-9]+$  ]]
+        then
+          _edit_last_item="${2:-}"
+
+          shift
+        else
+          _edit_last_item=1
+        fi
+        ;;
       --password)
         _password="$(_option_get_value "${1}" "${2:-}")"
 
         shift
         ;;
       *)
-        if [[ -z "${_selector:-}" ]]
+        if [[ -z "${_selector:-}"   ]]
         then
           _selector="${1:-}"
         fi
@@ -15047,7 +15204,25 @@ _edit() {
     shift
   done
 
-  [[ -z "${_selector:-}" ]] && _exit_1 _help "edit"
+  if ((_edit_last_item)) && [[ -z "${_selector:-}" ]]
+  then
+    _selector="$(
+      _list                             \
+        --empty                         \
+        --filenames                     \
+        --limit 1                       \
+        --no-color                      \
+        --no-id                         \
+        --no-indicator                  \
+        --page "${_edit_last_item:-1}"  \
+        2>/dev/null || :
+    )"
+  fi
+
+  if [[ -z "${_selector:-}" ]]
+  then
+    _exit_1 _help "edit"
+  fi
 
   local _relative_path=
   _relative_path="$(_show "${_selector:-}" --relative-path)"
@@ -15806,7 +15981,7 @@ _import() {
 
     local _add_timestamp=
     _add_timestamp="$(
-      sed -E -e 's/.*ADD_DATE=\"([[:digit:]]+)\".*/\1/g'  <<< "${_line}"
+      LC_ALL=C sed -E -e 's/.*ADD_DATE=\"([[:digit:]]+)\".*/\1/g' <<< "${_line}"
     )"
 
     local _target_filename=
@@ -15829,8 +16004,8 @@ _import() {
 
     local _tag_list=
     _tag_list="$(
-      grep -q 'TAGS=\"'                             <<< "${_line}" &&
-        sed -E -e 's/.*TAGS=\"([^\"]+)\".*/\1/g'    <<< "${_line}" || :
+      grep -q 'TAGS=\"'                                       <<< "${_line}" &&
+        LC_ALL=C sed -E -e 's/.*TAGS=\"([^\"]+)\".*/\1/g'     <<< "${_line}" || :
     )"
 
     if [[ -n "${_tag_list:-}"         ]]
@@ -15840,7 +16015,7 @@ _import() {
 
     local _title=
     _title="$(
-      sed -E -e 's/.*>(.*)<\/A>/\1/g'               <<< "${_line}"
+      LC_ALL=C sed -E -e 's/.*>(.*)<\/A>/\1/g'                <<< "${_line}"
     )"
 
     if [[ -n "${_title:-}"            ]]
@@ -15850,7 +16025,7 @@ _import() {
 
     local _url=
     _url="$(
-      sed -E -e 's/.*HREF=\"(.*)\" ADD_DATE.*/\1/g' <<< "${_line}"
+      LC_ALL=C sed -E -e 's/.*HREF=\"(.*)\" ADD_DATE.*/\1/g'  <<< "${_line}"
     )"
 
     _notebooks select "${_target_selector%%:*}"
@@ -16066,7 +16241,7 @@ _import() {
             then
               local _parent_folder_name=
               _parent_folder_name="$(
-                sed -E -e 's/.*>(.*)<\/H3>.*/\1/g' <<< "${__line}"
+                LC_ALL=C sed -E -e 's/.*>(.*)<\/H3>.*/\1/g' <<< "${__line}"
               )"
 
               _target_folder_relative_path="${_target_folder_relative_path}${_parent_folder_name}/"
@@ -16481,6 +16656,8 @@ _move() {
     else
       _exit_1 _help "move"
     fi
+
+    _target_basename="$(_normalize_encoding "${_target_basename}")"
 
     if [[ -z  "${_target_selector_relative_path:-}" ]]
     then
@@ -17677,7 +17854,7 @@ _search() {
 
           local _escaped_notebook_path=
           _escaped_notebook_path="$(
-            printf "%s\\n" "${_notebook_path:-}" | sed 's/\//\\\//g'
+            printf "%s\\n" "${_notebook_path:-}" | LC_ALL=C sed 's/\//\\\//g'
           )"
 
           if ((_max_depth))
@@ -17709,16 +17886,16 @@ _search() {
 
           if [[ "${#_queries[@]}" == 1 ]]
           then
-            GIT_PAGER='' git -C "${_notebook_path}"     \
-              grep                                      \
-              --extended-regexp                         \
-              --ignore-case                             \
-              --line-number                             \
-              --text                                    \
-              "${_search_args[@]:-}"                    \
-              -e "${_query:-}"                          \
-              "${_search_paths[@]:-}"                   \
-            | sed -e "s/^/${_escaped_notebook_path}\//" \
+            GIT_PAGER='' git -C "${_notebook_path}"               \
+              grep                                                \
+              --extended-regexp                                   \
+              --ignore-case                                       \
+              --line-number                                       \
+              --text                                              \
+              "${_search_args[@]:-}"                              \
+              -e "${_query:-}"                                    \
+              "${_search_paths[@]:-}"                             \
+            | LC_ALL=C sed -e "s/^/${_escaped_notebook_path}\//"  \
               || return 0  # Don't fail out within a single scope.
           else
             local __search_group=
@@ -17835,27 +18012,27 @@ _search() {
                     fi
                   done
 
-                  GIT_PAGER='' xargs "${_xargs[@]}"           \
-                    git -C "${_notebook_path}"                \
-                    grep                                      \
-                    --extended-regexp                         \
-                    --ignore-case                             \
-                    --line-number                             \
-                    --text                                    \
-                    "${_search_args[@]:-}"                    \
-                  | sed -e "s/^/${_escaped_notebook_path}\//" \
+                  GIT_PAGER='' xargs "${_xargs[@]}"                     \
+                    git -C "${_notebook_path}"                          \
+                    grep                                                \
+                    --extended-regexp                                   \
+                    --ignore-case                                       \
+                    --line-number                                       \
+                    --text                                              \
+                    "${_search_args[@]:-}"                              \
+                  | LC_ALL=C sed -e "s/^/${_escaped_notebook_path}\//"  \
                     || return 0  # Don't fail out within a single scope.
                 else
-                  GIT_PAGER='' xargs "${_xargs[@]}"           \
-                    git -C "${_notebook_path}"                \
-                    grep                                      \
-                    --extended-regexp                         \
-                    --ignore-case                             \
-                    --line-number                             \
-                    --text                                    \
-                    "${_search_args[@]:-}"                    \
-                    -e "${_query:-}"                          \
-                  | sed -e "s/^/${_escaped_notebook_path}\//" \
+                  GIT_PAGER='' xargs "${_xargs[@]}"                     \
+                    git -C "${_notebook_path}"                          \
+                    grep                                                \
+                    --extended-regexp                                   \
+                    --ignore-case                                       \
+                    --line-number                                       \
+                    --text                                              \
+                    "${_search_args[@]:-}"                              \
+                    -e "${_query:-}"                                    \
+                  | LC_ALL=C sed -e "s/^/${_escaped_notebook_path}\//"  \
                     || return 0  # Don't fail out within a single scope.
                 fi
               }
@@ -17891,7 +18068,7 @@ _search() {
             # https://unix.stackexchange.com/a/140255
             _path="$(
               printf "%s\\n" "${_line_path_segment}"              \
-                | sed                                             \
+                | LC_ALL=C sed                                    \
                     -e "s,$(printf '\033')\\[[0-9;]*[a-zA-Z],,g"  \
                     -e 's/ matches//g'
             )"
@@ -17916,7 +18093,7 @@ _search() {
           if [[ "${_last_path}" != "${_path}" ]]
           then
             if   [[ ! "${_path}" =~ .index    ]] &&
-                 [[ -z "$(sed -E "${_IGNORE_PATTERNS[@]:-}" <<< "${_path##*/}")" ]]
+                 [[ -z "$(LC_ALL=C sed -E "${_IGNORE_PATTERNS[@]:-}" <<< "${_path##*/}")" ]]
             then
               _skip=1
             elif [[ -n "${_type:-}"           ]]
@@ -18023,6 +18200,12 @@ _search() {
             _relative_folder_path="${_relative_folder_path#"${_notebook_path}"}"
 
             _filename="$(basename "${_path}")"
+
+            # normalize filenames with octal escape sequences from git grep
+            _filename="$(printf "%b\\n" "${_filename}")"
+            _filename="${_filename%\"}"
+            _filename="${_filename#\"}"
+
             _filename_color="${_filename}"
 
             # Use ".index" to match filenames.
@@ -18032,7 +18215,7 @@ _search() {
               _filename_color="$(printf "%s\\n" "${__line}" | cut -d: -f 3-)"
               _filename="$(
                 printf "%s\\n" "${_filename_color}" \
-                  | sed "s,$(printf '\033')\\[[0-9;]*[a-zA-Z],,g"
+                  | LC_ALL=C sed "s,$(printf '\033')\\[[0-9;]*[a-zA-Z],,g"
               )"
             fi
 
@@ -18754,7 +18937,7 @@ _show() {
   then
     GIT_PAGER='' git -C "${_notebook_path}" shortlog              \
       --summary --email -- "${_notebook_path}/${_relative_path}"  \
-      | sed "s/^[[:space:]]\{1,\}[[:digit:]]\{1,\}[[:space:]]\{1,\}//g"
+      | LC_ALL=C sed "s/^[[:space:]]\{1,\}[[:digit:]]\{1,\}[[:space:]]\{1,\}//g"
 
     return 0
   fi
@@ -18942,12 +19125,12 @@ ${_title/\[$' '\]/${_TPUT_SETAF_8}[ ]${_TPUT_SGR0}}"
 
     local _target_url=
     _target_url="$(
-      grep -E                         \
-        "${_url_match_patterns[@]:-}" \
-        "${_target_path}"             \
-        | head -n 1                   \
-        | sed "s/^[[:space:]]*<//g"   \
-        | sed "s/>[[:space:]]*$//g"   || :
+      grep -E                                 \
+        "${_url_match_patterns[@]:-}"         \
+        "${_target_path}"                     \
+        | head -n 1                           \
+        | LC_ALL=C sed "s/^[[:space:]]*<//g"  \
+        | LC_ALL=C sed "s/>[[:space:]]*$//g"  || :
     )"
 
     if [[ -z "${_target_url:-}"       ]]
@@ -19275,7 +19458,7 @@ Can't show archives. Export archive and expand to edit.\\n"
         --from  docx                        \
         --to    markdown                    \
         "${_target_path}"                   \
-        | sed -E                            \
+        | LC_ALL=C sed -E                   \
           -e 's/\\\[\\\[/\[\[/g'            \
           -e 's/\\\]\\\]/\]\]/g'            \
           | _highlight_syntax_if_available  \
@@ -24816,9 +24999,9 @@ HEREDOC
       then
         return 0
       else
-        _warn printf                                                \
-          "%s must be a number, \"auto,\" or \"auto-<number>\".\\n" \
-          "${1}"
+        _warn printf                                                                                \
+"%s must be a number or valid \"auto\" value.\\n"  \
+"${1}"
 
         return 1
       fi
@@ -25034,13 +25217,20 @@ $(
     $(_color_secondary " -----")
      The maximum number of items included in the \`${_ME}\` and \`${_ME} ls\` lists.
      Set to \`auto\` to automatically limit output to the current terminal height.
-     Subtract an auto limit offset for multiline prompts with \`auto-<number>\`.
+     Set a maximum auto limit with \`auto^<max>\`, e.g., \`auto^15\`.
+     Subtract an auto limit offset for multiline prompts with \`auto-<offset>\`.
+     Add an auto limit offet with \`auto+<offset>\`.
+     Combine both modifiers with \`auto-<offset>^<max>\` or \`auto+<offset>^<max>\`.
 
      • Example Values:
 
        15
        auto
+       auto^15
        auto-2
+       auto+2
+       auto-2^15
+       auto+2^15
 
      • Default Value: $(_color_primary "15")")
 
